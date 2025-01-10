@@ -12,11 +12,12 @@ class ExpenseApp(QWidget):
 
     def init_ui(self):
         self.setWindowTitle("Expense Tracker 2.0")
-        self.resize(550, 500)
+        self.setWindowState(Qt.WindowState.WindowMaximized)
 
         # Initialize Widgets
         self.date_box = QDateEdit()
         self.date_box.setDate(QDate.currentDate())
+        self.date_box.setMinimumHeight(30)  # ou self.date_box.setMaximumWidth(150) se quiseres uma largura máxima
         self.dropdown = QComboBox()
         self.amount = QLineEdit()
         self.description = QLineEdit()
