@@ -1,48 +1,51 @@
 # expense_app.py
-
-from PyQt6.QtWidgets import QWidget, QLabel, QPushButton, QLineEdit, QComboBox, QDateEdit, QTableWidget, QVBoxLayout, QHBoxLayout, QMessageBox, QTableWidgetItem, QHeaderView
+from PyQt6.QtWidgets import (
+    QWidget,
+    QLabel,
+    QPushButton,
+    QLineEdit,
+    QComboBox,
+    QDateEdit,
+    QTableWidget,
+    QVBoxLayout,
+    QHBoxLayout,
+    QMessageBox,
+    QTableWidgetItem,
+    QHeaderView,
+    QDialog,
+    QGraphicsOpacityEffect,
+)
 from PyQt6.QtCore import QDate, Qt
+
 from database import fetch_expenses, add_expense_to_db, delete_expense_from_db
 
-class ExpenseApp(QWidget):
-    def __init__(self):
-        super().__init__()
+
+class AddExpenseDialog(QDialog):
+    def __init__(self, parent=None):  # Aceita um parent
+        super().__init__(parent)
+        self.parent_window = parent # Guarda uma referencia para a janela pai
         self.init_ui()
-        self.load_table_data()
+        self.apply_styles() # Aplica os estilos
 
     def init_ui(self):
-        self.setWindowTitle("Expense Tracker 2.0")
-        self.setWindowState(Qt.WindowState.WindowMaximized)
+        self.setWindowTitle("Add Expense")
+        self.setWindowModality(Qt.WindowModality.ApplicationModal)
 
         # Initialize Widgets
         self.date_box = QDateEdit()
         self.date_box.setDate(QDate.currentDate())
-        self.date_box.setMinimumHeight(30)  # ou self.date_box.setMaximumWidth(150) se quiseres uma largura máxima
         self.dropdown = QComboBox()
         self.amount = QLineEdit()
         self.description = QLineEdit()
 
+        # Populate Dropdown Categories (assuming these are fetched from elsewhere)
+        categories = ["Food", "Transportation", "Rent", "Shopping", "Entertainment", "Bills", "Other"]
+        self.dropdown.addItems(categories)
+
         self.add_button = QPushButton("Add Expense")
-        self.delete_button = QPushButton("Delete Expense")
-
-        self.table = QTableWidget(0, 5)
-        self.table.setHorizontalHeaderLabels(["Id", "Date", "Category", "Amount", "Description"])
-        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
-
-        # Connect Buttons to Methods
         self.add_button.clicked.connect(self.add_expense)
-        self.delete_button.clicked.connect(self.delete_expense)
 
-        # Setup Layouts
-        self.setup_layout()
-
-        # Populate Dropdown Categories
-        self.populate_dropdown()
-
-        # Apply Styling
-        self.apply_styles()
-
-    def setup_layout(self):
+        # Setup Layout
         layout = QVBoxLayout()
         row1 = QHBoxLayout()
         row2 = QHBoxLayout()
@@ -60,21 +63,91 @@ class ExpenseApp(QWidget):
         row2.addWidget(QLabel("Description:"))
         row2.addWidget(self.description)
 
-        # Row 3 (Buttons)
-        row3.addWidget(self.add_button)
-        row3.addWidget(self.delete_button)
+        # Row 3 (Button)
+        row3.addWidget(self.add_button, alignment=Qt.AlignmentFlag.AlignCenter)
 
-        # Add rows to main layout
         layout.addLayout(row1)
         layout.addLayout(row2)
         layout.addLayout(row3)
-        layout.addWidget(self.table)
-
         self.setLayout(layout)
 
+    def apply_styles(self): # Aplica os estilos da janela pai
+        if self.parent_window is not None:
+            self.setStyleSheet(self.parent_window.styleSheet())
+
+    def add_expense(self):
+        date = self.date_box.date().toString("yyyy-MM-dd")
+        category = self.dropdown.currentText()
+        amount = self.amount.text()
+        description = self.description.text()
+
+        if not amount or not description:
+            QMessageBox.warning(self, "Input Error", "Amount and Description cannot be empty!")
+            return
+
+        if add_expense_to_db(date, category, amount, description):
+            self.close()
+            self.parent_window.load_table_data() # Atualiza a tabela na janela principal
+            QMessageBox.information(self, "Success", "Expense added successfully!")
+        else:
+            QMessageBox.critical(self, "Error", "Failed to add expense")
+
+    def closeEvent(self, event): # Garante que a opacidade volta ao normal
+        if self.parent_window is not None:
+            self.parent_window.setGraphicsEffect(None)
+        event.accept()
+    
     def populate_dropdown(self):
         categories = ["Food", "Transportation", "Rent", "Shopping", "Entertainment", "Bills", "Other"]
         self.dropdown.addItems(categories)
+
+class ExpenseApp(QWidget):
+    def __init__(self):
+        super().__init__()
+        self.init_ui()
+        self.load_table_data()
+
+    def init_ui(self):
+        self.setWindowTitle("Expense Tracker 2.0")
+        self.setWindowState(Qt.WindowState.WindowMaximized)
+
+        self.add_button = QPushButton("Add Expense")
+        self.delete_button = QPushButton("Delete Expense")
+
+        self.table = QTableWidget(0, 5)
+        self.table.setHorizontalHeaderLabels(["Id", "Date", "Category", "Amount", "Description"])
+        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+
+        # Connect Buttons to Methods
+        self.add_button.clicked.connect(self.show_add_expense_dialog)
+        self.delete_button.clicked.connect(self.delete_expense)
+
+        # Setup Layouts
+        self.setup_layout()
+
+        # Apply Styling
+        self.apply_styles()
+
+    def show_add_expense_dialog(self):
+        self.add_expense_dialog = AddExpenseDialog(self) # Passa a janela principal como parent
+        opacity_effect = QGraphicsOpacityEffect()
+        opacity_effect.setOpacity(0.5) # Define a opacidade
+        self.setGraphicsEffect(opacity_effect) # Aplica o efeito
+        self.add_expense_dialog.exec() # Usamos exec() para modalidade
+
+    def setup_layout(self):
+        layout = QVBoxLayout()
+        row1 = QHBoxLayout()
+
+        # Row 3 (Buttons)
+        row1.addWidget(self.add_button)
+        row1.addWidget(self.delete_button)
+
+        # Add rows to main layout
+        layout.addLayout(row1)
+        layout.addWidget(self.table)
+
+        self.setLayout(layout)
 
     def apply_styles(self):
         self.setStyleSheet("""
@@ -184,22 +257,6 @@ class ExpenseApp(QWidget):
             self.table.insertRow(row_idx)
             for col_idx, data in enumerate(expense):
                 self.table.setItem(row_idx, col_idx, QTableWidgetItem(str(data)))
-
-    def add_expense(self):
-        date = self.date_box.date().toString("yyyy-MM-dd")
-        category = self.dropdown.currentText()
-        amount = self.amount.text()
-        description = self.description.text()
-
-        if not amount or not description:
-            QMessageBox.warning(self, "Input Error", "Amount and Description cannot be empty!")
-            return
-
-        if add_expense_to_db(date, category, amount, description):
-            self.load_table_data()
-            self.clear_inputs()
-        else:
-            QMessageBox.critical(self, "Error", "Failed to add expense")
 
     def delete_expense(self):
         selected_row = self.table.currentRow()
