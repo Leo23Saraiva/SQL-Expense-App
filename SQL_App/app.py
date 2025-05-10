@@ -17,82 +17,73 @@ class AddExpenseDialog(QDialog):
         self.apply_styles()
 
     def init_ui(self):
-        self.setWindowTitle("Add/Edit Record")
+        self.setWindowTitle("MBAuto - Detalhes")
         self.setWindowModality(Qt.WindowModality.ApplicationModal)
 
         # Campos
-        self.reg_num = QLineEdit()
-        self.comp_doc = QLineEdit()
-        self.comp_val = QLineEdit()
-        self.vend_comp_doc = QLineEdit()
-        self.vend_vend_doc = QLineEdit()
-        self.vend_liq_val = QLineEdit()
-        self.apur_pv = QLineEdit()
-        self.apur_taxa = QLineEdit()
-        self.apur_imp = QLineEdit()
-        self.rep_doc = QLineEdit()
-        self.rep_liq_val = QLineEdit()
-        self.regime_iva = QLineEdit()
-        self.obs_imp_auto = QLineEdit()
-        self.obs_matricula = QLineEdit()
-        self.obs_mat_estrangeira = QLineEdit()
-        self.obs_marca = QLineEdit()
-        self.data_venda = QDateEdit()
-        self.data_venda.setDate(QDate.currentDate())
+        self.matricula = QLineEdit()
+        self.marca = QLineEdit()
+        self.isv = QLineEdit()
+        self.nRegistoContabilidade = QLineEdit()
 
+        self.dataCompra = QDateEdit()
+        self.dataCompra.setDate(QDate.currentDate())
+        self.docCompra = QLineEdit()
+        self.tipoDocumento = QComboBox()
+        self.tipoDocumento.addItems(["Fatura", "Fatura-Recibo", "Fatura Simplificada", "Declaração"])
+        self.valorCompra = QLineEdit()
+
+        self.dataVenda = QDateEdit()
+        self.dataVenda.setDate(QDate.currentDate())
+        self.docVenda = QLineEdit()
+        self.valorVenda = QLineEdit()
+
+        # self.regime = QLineEdit()
+        self.imposto = QLineEdit()
+        self.taxa = QLineEdit()
 
         # Layouts agrupados
+        identificacao_group = QGroupBox("Identificação")
+        identificacao_layout = QFormLayout()
+        identificacao_layout.addRow("Matrícula:", self.matricula)
+        identificacao_layout.addRow("Marca:", self.marca)
+        identificacao_layout.addRow("ISV:", self.isv)
+        identificacao_layout.addRow("Nº Registo de Contabilidade:", self.nRegistoContabilidade)
+        identificacao_group.setLayout(identificacao_layout)
+
         compras_group = QGroupBox("Compras")
         compras_layout = QFormLayout()
-        compras_layout.addRow("Documento:", self.comp_doc)
-        compras_layout.addRow("Valor Total:", self.comp_val)
+        compras_layout.addRow("Data de Compra:", self.dataCompra)
+        compras_layout.addRow("Documento de Compra:", self.docCompra)
+        compras_layout.addRow("Tipo de Documento:", self.tipoDocumento)
+        compras_layout.addRow("Valor de Compra:", self.valorCompra)
         compras_group.setLayout(compras_layout)
 
         vendas_group = QGroupBox("Vendas")
         vendas_layout = QFormLayout()
-        vendas_layout.addRow("Documento de Compra:", self.vend_comp_doc)
-        vendas_layout.addRow("Documento de Venda:", self.vend_vend_doc)
-        vendas_layout.addRow("Valor Líquido:", self.vend_liq_val)
+        vendas_layout.addRow("Data de Venda:", self.dataVenda)
+        vendas_layout.addRow("Documento de Venda:", self.docVenda)
+        vendas_layout.addRow("Valor Venda:", self.valorVenda)
         vendas_group.setLayout(vendas_layout)
 
-        apuramento_group = QGroupBox("Apuramento do Imposto")
-        apuramento_layout = QFormLayout()
-        apuramento_layout.addRow("Preço Venda - Preço Compra:", self.apur_pv)
-        apuramento_layout.addRow("Taxa (%):", self.apur_taxa)
-        apuramento_layout.addRow("Imposto:", self.apur_imp)
-        apuramento_group.setLayout(apuramento_layout)
-
-        reparacoes_group = QGroupBox("Reparações")
-        reparacoes_layout = QFormLayout()
-        reparacoes_layout.addRow("Documento:", self.rep_doc)
-        reparacoes_layout.addRow("Valor Total Líquido:", self.rep_liq_val)
-        reparacoes_group.setLayout(reparacoes_layout)
-
-        observacoes_group = QGroupBox("Observações")
-        observacoes_layout = QFormLayout()
-        observacoes_layout.addRow("Imposto Sobre Automóveis:", self.obs_imp_auto)
-        observacoes_layout.addRow("Matrícula:", self.obs_matricula)
-        observacoes_layout.addRow("Matrícula Estrangeira:", self.obs_mat_estrangeira)
-        observacoes_layout.addRow("Marca:", self.obs_marca)
-        observacoes_group.setLayout(observacoes_layout)
+        imposto_group = QGroupBox("Imposto")
+        imposto_layout = QFormLayout()
+        # imposto_layout.addRow("Regime:", self.regime)
+        imposto_layout.addRow("Imposto:", self.imposto)
+        imposto_layout.addRow("Taxa:", self.taxa)
+        imposto_group.setLayout(imposto_layout)
 
         # Layout principal
         main_layout = QVBoxLayout()
-        main_layout.addWidget(QLabel("Número de ordem do registo (contabilidade):"))
-        main_layout.addWidget(self.reg_num)
+        main_layout.addWidget(identificacao_group)
         main_layout.addWidget(compras_group)
         main_layout.addWidget(vendas_group)
-        main_layout.addWidget(apuramento_group)
-        main_layout.addWidget(reparacoes_group)
-        main_layout.addWidget(QLabel("Regime IVA:"))
-        main_layout.addWidget(self.regime_iva)
-        main_layout.addWidget(observacoes_group)
-        main_layout.addWidget(QLabel("Data de Venda:"))
-        main_layout.addWidget(self.data_venda)
-        self.data_venda.setMinimumHeight(30)
+        main_layout.addWidget(imposto_group)
+        self.dataCompra.setMinimumHeight(30)
+        self.dataVenda.setMinimumHeight(30)
 
         self.add_button = QPushButton("Add/Edit Record")
-        self.add_button.clicked.connect(self.add_record) # Renomeado para add_record
+        self.add_button.clicked.connect(self.add_record)
         main_layout.addWidget(self.add_button)
 
         self.setLayout(main_layout)
@@ -101,43 +92,40 @@ class AddExpenseDialog(QDialog):
         if self.parent_window is not None:
             self.setStyleSheet(self.parent_window.styleSheet())
 
-    def add_record(self): # Renomeado para add_record
-        # Aqui vais validar e formatar os dados antes de os passar para a BD
+    def add_record(self):
         try:
-            comp_val = Decimal(self.comp_val.text().replace(",", ".")) if self.comp_val.text() else None
-            vend_liq_val = Decimal(self.vend_liq_val.text().replace(",", ".")) if self.vend_liq_val.text() else None
-            apur_pv = Decimal(self.apur_pv.text().replace(",", ".")) if self.apur_pv.text() else None
-            apur_taxa = int(self.apur_taxa.text().replace("%", "")) if self.apur_taxa.text() else None
-            apur_imp = Decimal(self.apur_imp.text().replace(",", ".")) if self.apur_imp.text() else None
-            rep_liq_val = Decimal(self.rep_liq_val.text().replace(",", ".")) if self.rep_liq_val.text() else None
-            obs_imp_auto = Decimal(self.obs_imp_auto.text().replace(",", ".")) if self.obs_imp_auto.text() else None
+            isv_formatado = Decimal(self.isv.text().replace(",", ".")) if self.isv.text() else None
+            valor_compra_formatado = Decimal(
+                self.valorCompra.text().replace(",", ".")) if self.valorCompra.text() else None
+            valor_venda_formatado = Decimal(
+                self.valorVenda.text().replace(",", ".")) if self.valorVenda.text() else None
 
-            # Formatar para apresentação (exemplo)
-            comp_val_str = f"{comp_val:.2f} €" if comp_val is not None else ""
-            vend_liq_val_str = f"{vend_liq_val:.2f} €" if vend_liq_val is not None else ""
-            apur_pv_str = f"{apur_pv:.2f} €" if apur_pv is not None else ""
-            apur_taxa_str = f"{apur_taxa}%" if apur_taxa is not None else ""
-            apur_imp_str = f"{apur_imp:.2f} €" if apur_imp is not None else ""
-            rep_liq_val_str = f"{rep_liq_val:.2f} €" if rep_liq_val is not None else ""
-            obs_imp_auto_str = f"{obs_imp_auto:.2f} €" if obs_imp_auto is not None else ""
-            data_venda = self.data_venda.date().toString("yyyy-MM-dd")
-            # ... (Resto da lógica para adicionar à BD, usando os valores convertidos)
-            if add_expense_to_db(self.reg_num.text(), self.comp_doc.text(), comp_val, self.vend_comp_doc.text(), self.vend_vend_doc.text(), vend_liq_val, apur_pv, apur_taxa, apur_imp, self.rep_doc.text(), rep_liq_val, self.regime_iva.text(), obs_imp_auto, self.obs_matricula.text(), self.obs_mat_estrangeira.text(), self.obs_marca.text(), data_venda):
+            # Formatar para apresentação
+            # isv_str = f"{isv_formatado:.2f} €" if isv_formatado is not None else ""
+            # valor_compra_str = f"{valor_compra_formatado:.2f} €" if valor_compra_formatado is not None else ""
+            # valor_venda_str = f"{valor_venda_formatado:.2f} €" if valor_venda_formatado is not None else ""
+
+            data_compra_str = self.dataCompra.date().toString("yyyy-MM-dd")
+            data_venda_str = self.dataVenda.date().toString("yyyy-MM-dd")
+
+            if add_expense_to_db(self.matricula.text(), self.marca.text(), isv_formatado,
+                                 self.nRegistoContabilidade.text(), data_compra_str, self.docCompra.text(),
+                                 self.tipoDocumento.currentText(), valor_compra_formatado, data_venda_str,
+                                 self.docVenda.text(), valor_venda_formatado, self.imposto.text(), self.taxa.text()):
                 self.close()
                 self.parent_window.load_table_data()
                 QMessageBox.information(self, "Success", "Record added successfully!")
             else:
                 QMessageBox.critical(self, "Error", "Failed to add record")
-        except: ValueError
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Failed to add record: {e}")
+            raise
 
-    def closeEvent(self, event): # Garante que a opacidade volta ao normal
+    def closeEvent(self, event):  # Garante que a opacidade volta ao normal
         if self.parent_window is not None:
             self.parent_window.setGraphicsEffect(None)
         event.accept()
-    
-    def populate_dropdown(self):
-        categories = ["Food", "Transportation", "Rent", "Shopping", "Entertainment", "Bills", "Other"]
-        self.dropdown.addItems(categories)
+
 
 class ExpenseApp(QWidget):
     def __init__(self):
@@ -146,14 +134,15 @@ class ExpenseApp(QWidget):
         self.load_table_data()
 
     def init_ui(self):
-        self.setWindowTitle("Expense Tracker 2.0")
+        self.setWindowTitle("MBAuto")
         self.setWindowState(Qt.WindowState.WindowMaximized)
 
         self.add_button = QPushButton("Add Expense")
         self.delete_button = QPushButton("Delete Expense")
 
-        self.table = QTableWidget(0, 5)
-        self.table.setHorizontalHeaderLabels(["Id", "Date", "Category", "Amount", "Description"])
+        self.table = QTableWidget(0, 6)
+        self.table.setHorizontalHeaderLabels(
+            ["Matrícula", "Marca", "Valor de Compra", "Documento de Venda", "Valor de Venda", "Imposto"])
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
 
         # Connect Buttons to Methods
@@ -167,11 +156,11 @@ class ExpenseApp(QWidget):
         self.apply_styles()
 
     def show_add_expense_dialog(self):
-        self.add_expense_dialog = AddExpenseDialog(self) # Passa a janela principal como parent
+        self.add_expense_dialog = AddExpenseDialog(self)  # Passa a janela principal como parent
         opacity_effect = QGraphicsOpacityEffect()
-        opacity_effect.setOpacity(0.5) # Define a opacidade
-        self.setGraphicsEffect(opacity_effect) # Aplica o efeito
-        self.add_expense_dialog.exec() # Usamos exec() para modalidade
+        opacity_effect.setOpacity(0.5)  # Define a opacidade
+        self.setGraphicsEffect(opacity_effect)  # Aplica o efeito
+        self.add_expense_dialog.exec()  # Usamos exec() para modalidade
 
     def setup_layout(self):
         layout = QVBoxLayout()
@@ -287,7 +276,6 @@ class ExpenseApp(QWidget):
     }
 """)
 
-
     def load_table_data(self):
         expenses = fetch_expenses()
         self.table.setRowCount(0)
@@ -303,8 +291,9 @@ class ExpenseApp(QWidget):
             return
 
         expense_id = int(self.table.item(selected_row, 0).text())
-        confirm = QMessageBox.question(self, "Confirm", "Are you sure you want to delete this expense?", QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
-        
+        confirm = QMessageBox.question(self, "Confirm", "Are you sure you want to delete this expense?",
+                                       QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+
         if confirm == QMessageBox.StandardButton.Yes and delete_expense_from_db(expense_id):
             self.load_table_data()
 
