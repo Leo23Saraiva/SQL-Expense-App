@@ -151,6 +151,8 @@ class ExpenseApp(QWidget):
         self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.table.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self.table.cellDoubleClicked.connect(self.open_edit_expense_dialog)
 
         # Connect Buttons to Methods
         self.add_button.clicked.connect(self.show_add_expense_dialog)
@@ -168,6 +170,26 @@ class ExpenseApp(QWidget):
         opacity_effect.setOpacity(0.5)  # Define a opacidade
         self.setGraphicsEffect(opacity_effect)  # Aplica o efeito
         self.add_expense_dialog.exec()  # Usamos exec() para modalidade
+
+    def open_edit_expense_dialog(self, row, column):
+            dialog = AddExpenseDialog(self)
+
+            # Preenche os campos com os dados da linha
+            dialog.matricula.setText(self.table.item(row, 0).text())
+            dialog.marca.setText(self.table.item(row, 1).text())
+            dialog.valorCompra.setText(self.table.item(row, 2).text())
+            dialog.docVenda.setText(self.table.item(row, 3).text())
+            dialog.valorVenda.setText(self.table.item(row, 4).text())
+            dialog.imposto.setText(self.table.item(row, 5).text())
+
+            # Se quiseres impedir edição, podes desativar os campos:
+            # dialog.matricula.setReadOnly(True)  ← útil se só queres visualização
+
+            # Mostrar a janela
+            opacity_effect = QGraphicsOpacityEffect()
+            opacity_effect.setOpacity(0.5)
+            self.setGraphicsEffect(opacity_effect)
+            dialog.exec()
 
     def setup_layout(self):
         layout = QVBoxLayout()

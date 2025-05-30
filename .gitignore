@@ -4,3 +4,4 @@ SQL_App/__pycache__/app.cpython-313.pyc
 SQL_App/__pycache__/database.cpython-313.pyc
 *.pyc
 *.xml
+SQL_App/vehicles.db
