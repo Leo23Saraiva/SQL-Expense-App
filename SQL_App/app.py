@@ -93,12 +93,15 @@ class AddExpenseDialog(QDialog):
             self.setStyleSheet(self.parent_window.styleSheet())
 
     def add_record(self):
+        global isv_formatado, valor_compra_formatado, valor_venda_formatado
         try:
-            isv_formatado = Decimal(self.isv.text().replace(",", ".")) if self.isv.text() else None
-            valor_compra_formatado = Decimal(
-                self.valorCompra.text().replace(",", ".")) if self.valorCompra.text() else None
-            valor_venda_formatado = Decimal(
-                self.valorVenda.text().replace(",", ".")) if self.valorVenda.text() else None
+            try:
+                isv_formatado = float(self.isv.text().replace(",", ".")) if self.isv.text() else None
+                valor_compra_formatado = float(
+                    self.valorCompra.text().replace(",", ".")) if self.valorCompra.text() else None
+                valor_venda_formatado = float(self.valorVenda.text().replace(",", ".")) if self.valorVenda.text() else None
+            except InvalidOperation:
+                QMessageBox.warning(self, "Dados errados", "Decimais inválidos.")
 
             # Formatar para apresentação
             # isv_str = f"{isv_formatado:.2f} €" if isv_formatado is not None else ""

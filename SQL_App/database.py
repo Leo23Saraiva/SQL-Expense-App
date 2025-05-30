@@ -32,10 +32,13 @@ def init_db(db_name):
 
 
 def fetch_expenses():
-    query = QSqlQuery("SELECT * FROM vehicles ORDER BY date DESC")
+    query = QSqlQuery(
+        "SELECT matricula, marca, valorCompra, docVenda, valorVenda, imposto "
+        "FROM vehicles"
+    )
     vehicles = []
     while query.next():
-        vehicles.append([query.value(i) for i in range(5)])
+        vehicles.append([query.value(i) for i in range(6)])
     return vehicles
 
 
