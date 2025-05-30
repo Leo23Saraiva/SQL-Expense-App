@@ -63,9 +63,9 @@ class AddExpenseDialog(QDialog):
         self.taxa.setText(self.initial_data.get("taxa", ""))
 
         regime_salvo = self.initial_data.get("regime_fiscal", "")
-        if regime_salvo == "Regime Geral":
+        if regime_salvo == "Regime Normal":  # <-- Possível problema aqui
             self.regime_geral_radio.setChecked(True)
-        elif regime_salvo == "Regime de Lucro Tributável":
+        elif regime_salvo == "Margem":  # <-- Possível problema aqui
             self.regime_lucro_tributavel_radio.setChecked(True)
         else:
             # Se não houver nada salvo ou for um valor inesperado,
@@ -174,9 +174,9 @@ class AddExpenseDialog(QDialog):
 
             regime_fiscal = ""
             if self.regime_geral_radio.isChecked():
-                regime_fiscal = "Regime Normal" # Ajustei para "Regime Normal" conforme o seu init_ui
+                regime_fiscal = "Regime Normal"
             elif self.regime_lucro_tributavel_radio.isChecked():
-                regime_fiscal = "Margem" # Ajustei para "Margem" conforme o seu init_ui
+                regime_fiscal = "Margem"
 
             if self.mode == "edit":
                 success = update_expense_in_db(self.initial_data["id"], {
