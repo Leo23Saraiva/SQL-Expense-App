@@ -33,12 +33,12 @@ def init_db(db_name):
 
 def fetch_expenses():
     query = QSqlQuery(
-        "SELECT matricula, marca, valorCompra, docVenda, valorVenda, imposto "
+        "SELECT id, matricula, marca, valorCompra, docVenda, valorVenda, imposto "
         "FROM vehicles"
     )
     vehicles = []
     while query.next():
-        vehicles.append([query.value(i) for i in range(6)])
+        vehicles.append([query.value(i) for i in range(7)])  # Now 7 columns
     return vehicles
 
 

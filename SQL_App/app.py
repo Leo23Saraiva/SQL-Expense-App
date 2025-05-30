@@ -143,9 +143,13 @@ class ExpenseApp(QWidget):
         self.add_button = QPushButton("Add Expense")
         self.delete_button = QPushButton("Delete Expense")
 
-        self.table = QTableWidget(0, 6)
+        self.table = QTableWidget(0, 7)
         self.table.setHorizontalHeaderLabels(
-            ["Matrícula", "Marca", "Valor de Compra", "Documento de Venda", "Valor de Venda", "Imposto"])
+            ["ID", "Matrícula", "Marca", "Valor de Compra", "Documento de Venda", "Valor de Venda", "Imposto"]
+        )
+        self.table.setColumnHidden(0, True)  # Hide ID column
+        self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        self.table.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
 
         # Connect Buttons to Methods
@@ -219,11 +223,14 @@ class ExpenseApp(QWidget):
         background-color: #ffffff;
         alternate-background-color: #f2f7fb;
         gridline-color: #c0c9d0;
-        selection-background-color: #4caf50;
-        selection-color: white;
         font-size: 14px;
         border: 1px solid #cfd9e1;
     }
+    QTableWidget::item:selected {
+        background-color: #d0d7de; /* Cinzento claro visível */
+        color: #000000; /* Texto preto legível */
+    }
+
     QHeaderView::section {
         background-color: #4caf50;
         color: white;
@@ -293,12 +300,14 @@ class ExpenseApp(QWidget):
             QMessageBox.warning(self, "No Selection", "Please select an expense to delete.")
             return
 
-        expense_id = int(self.table.item(selected_row, 0).text())
+        expense_id = int(self.table.item(selected_row, 0).text())  # Hidden ID column
         confirm = QMessageBox.question(self, "Confirm", "Are you sure you want to delete this expense?",
                                        QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
 
-        if confirm == QMessageBox.StandardButton.Yes and delete_expense_from_db(expense_id):
-            self.load_table_data()
+        if confirm == QMessageBox.StandardButton.Yes:
+            if delete_expense_from_db(expense_id):
+                self.load_table_data()
+                self.table.clearSelection()  # Deselect after deleting
 
     def clear_inputs(self):
         self.date_box.setDate(QDate.currentDate())
