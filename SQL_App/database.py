@@ -1,12 +1,13 @@
 # database.py
 
-from PyQt6.QtSql import QSqlDatabase, QSqlQuery
+from PyQt6.QtSql import QSqlDatabase, QSqlQuery, QSqlError
 
 
 def init_db(db_name):
     database = QSqlDatabase.addDatabase("QSQLITE")
     database.setDatabaseName(db_name)
     if not database.open():
+        print(f"Erro ao abrir a base de dados: {database.lastError().text()}") # Mensagem de erro mais detalhada
         return False
 
     query = QSqlQuery()
@@ -29,6 +30,76 @@ def init_db(db_name):
      )
     """)
     return True
+
+
+def update_expense_in_db(id, data: dict):
+    query = QSqlQuery()
+    query.prepare("""
+        UPDATE vehicles SET
+            matricula = :matricula,
+            marca = :marca,
+            isv = :isv,
+            nRegistoContabilidade = :nRegistoContabilidade,
+            dataCompra = :dataCompra,
+            docCompra = :docCompra,
+            tipoDocumento = :tipoDocumento,
+            valorCompra = :valorCompra,
+            dataVenda = :dataVenda,
+            docVenda = :docVenda,
+            valorVenda = :valorVenda,
+            imposto = :imposto,
+            taxa = :taxa
+        WHERE id = :id
+    """)
+
+    # Ligação de parâmetros - As chaves do dicionário 'data' DEVEM corresponder aos placeholders
+    query.bindValue(":matricula", data.get("matricula"))
+    query.bindValue(":marca", data.get("marca"))
+    query.bindValue(":isv", data.get("isv"))
+    query.bindValue(":nRegistoContabilidade", data.get("nRegistoContabilidade"))
+    query.bindValue(":dataCompra", data.get("dataCompra"))
+    query.bindValue(":docCompra", data.get("docCompra"))
+    query.bindValue(":tipoDocumento", data.get("tipoDocumento"))
+    query.bindValue(":valorCompra", data.get("valorCompra"))
+    query.bindValue(":dataVenda", data.get("dataVenda"))
+    query.bindValue(":docVenda", data.get("docVenda"))
+    query.bindValue(":valorVenda", data.get("valorVenda"))
+    query.bindValue(":imposto", data.get("imposto"))
+    query.bindValue(":taxa", data.get("taxa"))
+    query.bindValue(":id", id)
+
+    if not query.exec():
+        print("Valores vinculados:", query.boundValues())
+        print("Erro ao atualizar (SQL Error):", query.lastError().text())
+        return False
+
+    return True
+
+
+def fetch_vehicle_by_id(vehicle_id):
+    query = QSqlQuery()
+    query.prepare("SELECT * FROM vehicles WHERE id = ?")
+    query.addBindValue(vehicle_id)
+    if query.exec() and query.next():
+        # Map column names to values
+        vehicle_data = {
+            "id": query.value("id"),
+            "matricula": query.value("matricula"),
+            "marca": query.value("marca"),
+            "isv": query.value("isv"),
+            "nRegistoContabilidade": query.value("nRegistoContabilidade"),
+            "dataCompra": query.value("dataCompra"),
+            "docCompra": query.value("docCompra"),
+            "tipoDocumento": query.value("tipoDocumento"),
+            "valorCompra": query.value("valorCompra"),
+            "dataVenda": query.value("dataVenda"),
+            "docVenda": query.value("docVenda"),
+            "valorVenda": query.value("valorVenda"),
+            "imposto": query.value("imposto"),
+            "taxa": query.value("taxa"),
+        }
+        return vehicle_data
+    return None
 
 
 def fetch_expenses():

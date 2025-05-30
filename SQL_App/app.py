@@ -6,15 +6,60 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import QDate, Qt, QLocale
 from decimal import Decimal
 
-from database import fetch_expenses, add_expense_to_db, delete_expense_from_db
+from database import fetch_expenses, add_expense_to_db, delete_expense_from_db, update_expense_in_db, fetch_vehicle_by_id
 
 
 class AddExpenseDialog(QDialog):
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, mode="add", initial_data=None):
         super().__init__(parent)
         self.parent_window = parent
+        self.mode = mode  # "add" ou "edit"
+        self.initial_data = initial_data
         self.init_ui()
         self.apply_styles()
+
+        if self.mode == "edit" and self.initial_data:
+            self.populate_fields()
+
+    def populate_fields(self):
+        # Usar .get() com um valor padrão para evitar KeyError e TypeError se o valor for None
+        self.matricula.setText(self.initial_data.get("matricula", ""))
+        self.marca.setText(self.initial_data.get("marca", ""))
+        # Convertendo para string apenas se não for None, caso contrário usa ""
+        self.isv.setText(str(self.initial_data.get("isv", "")) if self.initial_data.get("isv") is not None else "")
+        # AQUI ESTÁ A MUDANÇA PRINCIPAL PARA nRegistoContabilidade
+        self.nRegistoContabilidade.setText(str(self.initial_data.get("nRegistoContabilidade", "")) if self.initial_data.get("nRegistoContabilidade") is not None else "")
+
+
+        data_compra_str = self.initial_data.get("dataCompra")
+        if data_compra_str: # Só tenta converter se a string não for vazia ou None
+            self.dataCompra.setDate(QDate.fromString(data_compra_str, "yyyy-MM-dd"))
+        else:
+            self.dataCompra.setDate(QDate.currentDate()) # Define uma data padrão se não houver data
+
+        self.docCompra.setText(self.initial_data.get("docCompra", ""))
+        # Certifique-se de que o item selecionado existe no QComboBox
+        tipo_documento_str = self.initial_data.get("tipoDocumento", "")
+        index = self.tipoDocumento.findText(tipo_documento_str)
+        if index >= 0:
+            self.tipoDocumento.setCurrentIndex(index)
+        else:
+            self.tipoDocumento.setCurrentIndex(0) # Define o primeiro item como padrão
+
+
+        self.valorCompra.setText(str(self.initial_data.get("valorCompra", "")) if self.initial_data.get("valorCompra") is not None else "")
+
+        data_venda_str = self.initial_data.get("dataVenda")
+        if data_venda_str: # Só tenta converter se a string não for vazia ou None
+            self.dataVenda.setDate(QDate.fromString(data_venda_str, "yyyy-MM-dd"))
+        else:
+            self.dataVenda.setDate(QDate.currentDate()) # Define uma data padrão se não houver data
+
+        self.docVenda.setText(self.initial_data.get("docVenda", ""))
+        self.valorVenda.setText(str(self.initial_data.get("valorVenda", "")) if self.initial_data.get("valorVenda") is not None else "")
+
+        self.imposto.setText(self.initial_data.get("imposto", ""))
+        self.taxa.setText(self.initial_data.get("taxa", ""))
 
     def init_ui(self):
         self.setWindowTitle("MBAuto - Detalhes")
@@ -82,7 +127,8 @@ class AddExpenseDialog(QDialog):
         self.dataCompra.setMinimumHeight(30)
         self.dataVenda.setMinimumHeight(30)
 
-        self.add_button = QPushButton("Add/Edit Record")
+        btn_text = "Atualizar Registo" if self.mode == "edit" else "Adicionar Registo"
+        self.add_button = QPushButton(btn_text)
         self.add_button.clicked.connect(self.add_record)
         main_layout.addWidget(self.add_button)
 
@@ -93,36 +139,51 @@ class AddExpenseDialog(QDialog):
             self.setStyleSheet(self.parent_window.styleSheet())
 
     def add_record(self):
-        global isv_formatado, valor_compra_formatado, valor_venda_formatado
         try:
-            try:
-                isv_formatado = float(self.isv.text().replace(",", ".")) if self.isv.text() else None
-                valor_compra_formatado = float(
-                    self.valorCompra.text().replace(",", ".")) if self.valorCompra.text() else None
-                valor_venda_formatado = float(self.valorVenda.text().replace(",", ".")) if self.valorVenda.text() else None
-            except InvalidOperation:
-                QMessageBox.warning(self, "Dados errados", "Decimais inválidos.")
-
-            # Formatar para apresentação
-            # isv_str = f"{isv_formatado:.2f} €" if isv_formatado is not None else ""
-            # valor_compra_str = f"{valor_compra_formatado:.2f} €" if valor_compra_formatado is not None else ""
-            # valor_venda_str = f"{valor_venda_formatado:.2f} €" if valor_venda_formatado is not None else ""
+            isv = float(self.isv.text().replace(",", ".")) if self.isv.text() else None
+            valor_compra = float(self.valorCompra.text().replace(",", ".")) if self.valorCompra.text() else None
+            valor_venda = float(self.valorVenda.text().replace(",", ".")) if self.valorVenda.text() else None
 
             data_compra_str = self.dataCompra.date().toString("yyyy-MM-dd")
             data_venda_str = self.dataVenda.date().toString("yyyy-MM-dd")
 
-            if add_expense_to_db(self.matricula.text(), self.marca.text(), isv_formatado,
-                                 self.nRegistoContabilidade.text(), data_compra_str, self.docCompra.text(),
-                                 self.tipoDocumento.currentText(), valor_compra_formatado, data_venda_str,
-                                 self.docVenda.text(), valor_venda_formatado, self.imposto.text(), self.taxa.text()):
+            if self.mode == "edit":
+                success = update_expense_in_db(self.initial_data["id"], {
+                    "matricula": self.matricula.text(),
+                    "marca": self.marca.text(),
+                    "isv": isv,
+                    # Corrigir as chaves do dicionário para corresponder aos nomes das colunas/placeholders
+                    "nRegistoContabilidade": self.nRegistoContabilidade.text(), # AQUI MUDOU!
+                    "dataCompra": data_compra_str,                              # AQUI MUDOU!
+                    "docCompra": self.docCompra.text(),
+                    "tipoDocumento": self.tipoDocumento.currentText(),
+                    "valorCompra": valor_compra,
+                    "dataVenda": data_venda_str,                                # AQUI MUDOU!
+                    "docVenda": self.docVenda.text(),
+                    "valorVenda": valor_venda,
+                    "imposto": self.imposto.text(),
+                    "taxa": self.taxa.text()
+                })
+            else:
+                success = add_expense_to_db(
+                    self.matricula.text(), self.marca.text(), isv,
+                    self.nRegistoContabilidade.text(), data_compra_str, self.docCompra.text(),
+                    self.tipoDocumento.currentText(), valor_compra, data_venda_str,
+                    self.docVenda.text(), valor_venda, self.imposto.text(), self.taxa.text()
+                )
+
+            if success:
                 self.close()
                 self.parent_window.load_table_data()
-                QMessageBox.information(self, "Success", "Record added successfully!")
+                QMessageBox.information(self, "Sucesso", "Registo guardado com sucesso!")
             else:
-                QMessageBox.critical(self, "Error", "Failed to add record")
+                QMessageBox.critical(self, "Erro", "Erro ao guardar registo")
+
         except Exception as e:
-            QMessageBox.critical(self, "Error", f"Failed to add record: {e}")
-            raise
+            QMessageBox.critical(self, "Erro", f"Ocorreu um erro: {e}")
+            import traceback
+            traceback.print_exc() # Adicionado para melhor depuração
+            # raise # Re-lança a exceção para vê-la no console, se necessário
 
     def closeEvent(self, event):  # Garante que a opacidade volta ao normal
         if self.parent_window is not None:
@@ -172,24 +233,17 @@ class ExpenseApp(QWidget):
         self.add_expense_dialog.exec()  # Usamos exec() para modalidade
 
     def open_edit_expense_dialog(self, row, column):
-            dialog = AddExpenseDialog(self)
+        vehicle_id = int(self.table.item(row, 0).text())  # Get the ID from the hidden column
+        initial_data = fetch_vehicle_by_id(vehicle_id) # Fetch all data
 
-            # Preenche os campos com os dados da linha
-            dialog.matricula.setText(self.table.item(row, 0).text())
-            dialog.marca.setText(self.table.item(row, 1).text())
-            dialog.valorCompra.setText(self.table.item(row, 2).text())
-            dialog.docVenda.setText(self.table.item(row, 3).text())
-            dialog.valorVenda.setText(self.table.item(row, 4).text())
-            dialog.imposto.setText(self.table.item(row, 5).text())
-
-            # Se quiseres impedir edição, podes desativar os campos:
-            # dialog.matricula.setReadOnly(True)  ← útil se só queres visualização
-
-            # Mostrar a janela
+        if initial_data:
+            dialog = AddExpenseDialog(self, mode="edit", initial_data=initial_data)
             opacity_effect = QGraphicsOpacityEffect()
             opacity_effect.setOpacity(0.5)
             self.setGraphicsEffect(opacity_effect)
             dialog.exec()
+        else:
+            QMessageBox.critical(self, "Erro", "Não foi possível carregar os dados do veículo.")
 
     def setup_layout(self):
         layout = QVBoxLayout()
