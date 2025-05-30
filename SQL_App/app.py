@@ -1,7 +1,8 @@
 from PyQt6.QtWidgets import (
     QWidget, QLabel, QPushButton, QLineEdit, QComboBox, QDateEdit,
     QTableWidget, QVBoxLayout, QHBoxLayout, QMessageBox, QTableWidgetItem,
-    QHeaderView, QDialog, QGraphicsOpacityEffect, QGroupBox, QFormLayout
+    QHeaderView, QDialog, QGraphicsOpacityEffect, QGroupBox, QFormLayout,
+    QRadioButton
 )
 from PyQt6.QtCore import QDate, Qt, QLocale
 from decimal import Decimal
@@ -61,6 +62,17 @@ class AddExpenseDialog(QDialog):
         self.imposto.setText(self.initial_data.get("imposto", ""))
         self.taxa.setText(self.initial_data.get("taxa", ""))
 
+        regime_salvo = self.initial_data.get("regime_fiscal", "")
+        if regime_salvo == "Regime Geral":
+            self.regime_geral_radio.setChecked(True)
+        elif regime_salvo == "Regime de Lucro Tributável":
+            self.regime_lucro_tributavel_radio.setChecked(True)
+        else:
+            # Se não houver nada salvo ou for um valor inesperado,
+            # você pode decidir qual deve ser o padrão (e.g., nenhum ou um específico)
+            self.regime_geral_radio.setChecked(False)
+            self.regime_lucro_tributavel_radio.setChecked(False)
+
     def init_ui(self):
         self.setWindowTitle("MBAuto - Detalhes")
         self.setWindowModality(Qt.WindowModality.ApplicationModal)
@@ -111,9 +123,22 @@ class AddExpenseDialog(QDialog):
         vendas_layout.addRow("Valor Venda:", self.valorVenda)
         vendas_group.setLayout(vendas_layout)
 
+        self.imposto = QLineEdit()
+        self.taxa = QLineEdit()
+
+        # NOVOS CAMPOS: Checkboxes para o Regime Fiscal
+        self.regime_geral_radio = QRadioButton("Regime Normal")
+        self.regime_lucro_tributavel_radio = QRadioButton("Margem")
+
+        # Layout para as checkboxes
+        regime_layout = QHBoxLayout()
+        regime_layout.addWidget(self.regime_geral_radio)
+        regime_layout.addWidget(self.regime_lucro_tributavel_radio)
+        regime_layout.addStretch(1)
+
         imposto_group = QGroupBox("Imposto")
         imposto_layout = QFormLayout()
-        # imposto_layout.addRow("Regime:", self.regime)
+        imposto_layout.addRow("Regime Fiscal:", regime_layout)
         imposto_layout.addRow("Imposto:", self.imposto)
         imposto_layout.addRow("Taxa:", self.taxa)
         imposto_group.setLayout(imposto_layout)
@@ -147,29 +172,53 @@ class AddExpenseDialog(QDialog):
             data_compra_str = self.dataCompra.date().toString("yyyy-MM-dd")
             data_venda_str = self.dataVenda.date().toString("yyyy-MM-dd")
 
+            regime_fiscal = ""
+            if self.regime_geral_radio.isChecked():
+                regime_fiscal = "Regime Normal" # Ajustei para "Regime Normal" conforme o seu init_ui
+            elif self.regime_lucro_tributavel_radio.isChecked():
+                regime_fiscal = "Margem" # Ajustei para "Margem" conforme o seu init_ui
+
             if self.mode == "edit":
                 success = update_expense_in_db(self.initial_data["id"], {
                     "matricula": self.matricula.text(),
                     "marca": self.marca.text(),
                     "isv": isv,
-                    # Corrigir as chaves do dicionário para corresponder aos nomes das colunas/placeholders
-                    "nRegistoContabilidade": self.nRegistoContabilidade.text(), # AQUI MUDOU!
-                    "dataCompra": data_compra_str,                              # AQUI MUDOU!
+                    "nRegistoContabilidade": self.nRegistoContabilidade.text(),
+                    "dataCompra": data_compra_str,
                     "docCompra": self.docCompra.text(),
                     "tipoDocumento": self.tipoDocumento.currentText(),
                     "valorCompra": valor_compra,
-                    "dataVenda": data_venda_str,                                # AQUI MUDOU!
+                    "dataVenda": data_venda_str,
                     "docVenda": self.docVenda.text(),
                     "valorVenda": valor_venda,
                     "imposto": self.imposto.text(),
-                    "taxa": self.taxa.text()
+                    "taxa": self.taxa.text(),
+                    "regime_fiscal": regime_fiscal # Já estava correto aqui
                 })
             else:
+                print("\n--- Argumentos passados para add_expense_to_db ---")
+                print(f"matricula: {self.matricula.text()}")
+                print(f"marca: {self.marca.text()}")
+                print(f"isv: {isv}")
+                print(f"nRegistoContabilidade: {self.nRegistoContabilidade.text()}")
+                print(f"dataCompra: {data_compra_str}")
+                print(f"docCompra: {self.docCompra.text()}")
+                print(f"tipoDocumento: {self.tipoDocumento.currentText()}")
+                print(f"valorCompra: {valor_compra}")
+                print(f"dataVenda: {data_venda_str}")
+                print(f"docVenda: {self.docVenda.text()}")
+                print(f"valorVenda: {valor_venda}")
+                print(f"imposto: {self.imposto.text()}")
+                print(f"taxa: {self.taxa.text()}")
+                print(f"regime_fiscal: {regime_fiscal}")
+                print("--- Fim dos Argumentos ---")
+
                 success = add_expense_to_db(
                     self.matricula.text(), self.marca.text(), isv,
                     self.nRegistoContabilidade.text(), data_compra_str, self.docCompra.text(),
                     self.tipoDocumento.currentText(), valor_compra, data_venda_str,
-                    self.docVenda.text(), valor_venda, self.imposto.text(), self.taxa.text()
+                    self.docVenda.text(), valor_venda, self.imposto.text(), self.taxa.text(),
+                    regime_fiscal  # Esta linha é CRÍTICA
                 )
 
             if success:
@@ -182,8 +231,7 @@ class AddExpenseDialog(QDialog):
         except Exception as e:
             QMessageBox.critical(self, "Erro", f"Ocorreu um erro: {e}")
             import traceback
-            traceback.print_exc() # Adicionado para melhor depuração
-            # raise # Re-lança a exceção para vê-la no console, se necessário
+            traceback.print_exc()
 
     def closeEvent(self, event):  # Garante que a opacidade volta ao normal
         if self.parent_window is not None:

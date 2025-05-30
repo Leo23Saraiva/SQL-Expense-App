@@ -26,8 +26,9 @@ def init_db(db_name):
             docVenda TEXT,
             valorVenda REAL,
             imposto TEXT,
-            taxa TEXT
-     )
+            taxa TEXT,
+            regime_fiscal TEXT
+ )
     """)
     return True
 
@@ -48,7 +49,8 @@ def update_expense_in_db(id, data: dict):
             docVenda = :docVenda,
             valorVenda = :valorVenda,
             imposto = :imposto,
-            taxa = :taxa
+            taxa = :taxa,
+            regime_fiscal = :regime_fiscal  -- <--- ADICIONE ESTA LINHA!
         WHERE id = :id
     """)
 
@@ -66,10 +68,11 @@ def update_expense_in_db(id, data: dict):
     query.bindValue(":valorVenda", data.get("valorVenda"))
     query.bindValue(":imposto", data.get("imposto"))
     query.bindValue(":taxa", data.get("taxa"))
+    query.bindValue(":regime_fiscal", data.get("regime_fiscal")) # <--- ADICIONE ESTA LINHA!
     query.bindValue(":id", id)
 
     if not query.exec():
-        print("Valores vinculados:", query.boundValues())
+        print("Valores vinculados (UPDATE):", query.boundValues()) # Adicione "UPDATE" para diferenciar
         print("Erro ao atualizar (SQL Error):", query.lastError().text())
         return False
 
@@ -81,7 +84,6 @@ def fetch_vehicle_by_id(vehicle_id):
     query.prepare("SELECT * FROM vehicles WHERE id = ?")
     query.addBindValue(vehicle_id)
     if query.exec() and query.next():
-        # Map column names to values
         vehicle_data = {
             "id": query.value("id"),
             "matricula": query.value("matricula"),
@@ -97,6 +99,7 @@ def fetch_vehicle_by_id(vehicle_id):
             "valorVenda": query.value("valorVenda"),
             "imposto": query.value("imposto"),
             "taxa": query.value("taxa"),
+            "regime_fiscal": query.value("regime_fiscal"),
         }
         return vehicle_data
     return None
@@ -115,14 +118,14 @@ def fetch_expenses():
 
 def add_expense_to_db(
         matricula, marca, isv, nRegistoContabilidade, dataCompra, docCompra, tipoDocumento,
-        valorCompra, dataVenda, docVenda, valorVenda, imposto, taxa
+        valorCompra, dataVenda, docVenda, valorVenda, imposto, taxa, regime_fiscal # Adicione aqui
 ):
     query = QSqlQuery()
     query.prepare(
         "INSERT INTO vehicles "
         "(matricula, marca, isv, nRegistoContabilidade, dataCompra, docCompra, tipoDocumento, "
-        "valorCompra, dataVenda, docVenda, valorVenda, imposto, taxa) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+        "valorCompra, dataVenda, docVenda, valorVenda, imposto, taxa, regime_fiscal) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
     )
     query.addBindValue(matricula)
     query.addBindValue(marca)
@@ -137,6 +140,7 @@ def add_expense_to_db(
     query.addBindValue(valorVenda)
     query.addBindValue(imposto)
     query.addBindValue(taxa)
+    query.addBindValue(regime_fiscal)
 
     print("Prepared Query:", query.lastQuery())
     print("Bound values:")
@@ -153,6 +157,7 @@ def add_expense_to_db(
     print(f"11. valorVenda: {valorVenda}")
     print(f"12. imposto: {imposto}")
     print(f"13. taxa: {taxa}")
+    print(f"14. regime_fiscal: {regime_fiscal}")
 
     if not query.exec():
         print("SQL Error:", query.lastError().text())
