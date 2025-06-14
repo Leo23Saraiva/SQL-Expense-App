@@ -7,7 +7,8 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import QDate, Qt, QLocale
 from decimal import Decimal
 
-from database import fetch_expenses, add_expense_to_db, delete_expense_from_db, update_expense_in_db, fetch_vehicle_by_id
+from database import fetch_expenses, add_expense_to_db, delete_expense_from_db, update_expense_in_db, \
+    fetch_vehicle_by_id
 
 
 class AddExpenseDialog(QDialog):
@@ -26,17 +27,34 @@ class AddExpenseDialog(QDialog):
         # Usar .get() com um valor padrão para evitar KeyError e TypeError se o valor for None
         self.matricula.setText(self.initial_data.get("matricula", ""))
         self.marca.setText(self.initial_data.get("marca", ""))
-        # Convertendo para string apenas se não for None, caso contrário usa ""
-        self.isv.setText(str(self.initial_data.get("isv", "")) if self.initial_data.get("isv") is not None else "")
-        # AQUI ESTÁ A MUDANÇA PRINCIPAL PARA nRegistoContabilidade
-        self.nRegistoContabilidade.setText(str(self.initial_data.get("nRegistoContabilidade", "")) if self.initial_data.get("nRegistoContabilidade") is not None else "")
 
+        # --- FUNÇÃO AUXILIAR PARA FORMATAR NÚMEROS REAIS (Vazio para None/Vazio) ---
+        def format_real_for_display(value):
+            # Tenta converter para float. Se for None ou string vazia, retorna string vazia.
+            try:
+                if value is None or (isinstance(value, str) and not value.strip()):
+                    return ""  # Retorna vazio se o valor for None ou string vazia
+                else:
+                    numeric_value = float(value)
+                    return f"{numeric_value:.2f}".replace('.', ',')
+            except (ValueError, TypeError):
+                # Caso haja algum valor não numérico inesperado, retorna string vazia.
+                return ""
+
+        # --- FIM DA FUNÇÃO AUXILIAR ---
+
+        self.isv.setText(format_real_for_display(self.initial_data.get("isv")))
+
+        # Mantendo nRegistoContabilidade como TEXT no populate_fields conforme a sua decisão anterior
+        self.nRegistoContabilidade.setText(
+            str(self.initial_data.get("nRegistoContabilidade", "")) if self.initial_data.get(
+                "nRegistoContabilidade") is not None else "")
 
         data_compra_str = self.initial_data.get("dataCompra")
-        if data_compra_str: # Só tenta converter se a string não for vazia ou None
+        if data_compra_str:  # Só tenta converter se a string não for vazia ou None
             self.dataCompra.setDate(QDate.fromString(data_compra_str, "yyyy-MM-dd"))
         else:
-            self.dataCompra.setDate(QDate.currentDate()) # Define uma data padrão se não houver data
+            self.dataCompra.setDate(QDate.currentDate())  # Define uma data padrão se não houver data
 
         self.docCompra.setText(self.initial_data.get("docCompra", ""))
         # Certifique-se de que o item selecionado existe no QComboBox
@@ -45,31 +63,29 @@ class AddExpenseDialog(QDialog):
         if index >= 0:
             self.tipoDocumento.setCurrentIndex(index)
         else:
-            self.tipoDocumento.setCurrentIndex(0) # Define o primeiro item como padrão
+            self.tipoDocumento.setCurrentIndex(0)  # Define o primeiro item como padrão
 
-
-        self.valorCompra.setText(str(self.initial_data.get("valorCompra", "")) if self.initial_data.get("valorCompra") is not None else "")
+        self.valorCompra.setText(format_real_for_display(self.initial_data.get("valorCompra")))
 
         data_venda_str = self.initial_data.get("dataVenda")
-        if data_venda_str: # Só tenta converter se a string não for vazia ou None
+        if data_venda_str:  # Só tenta converter se a string não for vazia ou None
             self.dataVenda.setDate(QDate.fromString(data_venda_str, "yyyy-MM-dd"))
         else:
-            self.dataVenda.setDate(QDate.currentDate()) # Define uma data padrão se não houver data
+            self.dataVenda.setDate(QDate.currentDate())  # Define uma data padrão se não houver data
 
         self.docVenda.setText(self.initial_data.get("docVenda", ""))
-        self.valorVenda.setText(str(self.initial_data.get("valorVenda", "")) if self.initial_data.get("valorVenda") is not None else "")
+        self.valorVenda.setText(format_real_for_display(self.initial_data.get("valorVenda")))
 
-        self.imposto.setText(str(self.initial_data.get("imposto", "")) if self.initial_data.get("imposto") is not None else "")
-        self.taxa.setText(str(self.initial_data.get("taxa", "")) if self.initial_data.get("taxa") is not None else "")
+        # Aplicar a função de formatação para imposto e taxa
+        self.imposto.setText(format_real_for_display(self.initial_data.get("imposto")))
+        self.taxa.setText(format_real_for_display(self.initial_data.get("taxa")))
 
         regime_salvo = self.initial_data.get("regime_fiscal", "")
-        if regime_salvo == "Regime Normal":  # <-- Possível problema aqui
+        if regime_salvo == "Regime Normal":
             self.regime_geral_radio.setChecked(True)
-        elif regime_salvo == "Margem":  # <-- Possível problema aqui
+        elif regime_salvo == "Margem":
             self.regime_lucro_tributavel_radio.setChecked(True)
         else:
-            # Se não houver nada salvo ou for um valor inesperado,
-            # você pode decidir qual deve ser o padrão (e.g., nenhum ou um específico)
             self.regime_geral_radio.setChecked(False)
             self.regime_lucro_tributavel_radio.setChecked(False)
 
@@ -95,34 +111,6 @@ class AddExpenseDialog(QDialog):
         self.docVenda = QLineEdit()
         self.valorVenda = QLineEdit()
 
-        # self.regime = QLineEdit()
-        self.imposto = QLineEdit()
-        self.taxa = QLineEdit()
-
-        # Layouts agrupados
-        identificacao_group = QGroupBox("Identificação")
-        identificacao_layout = QFormLayout()
-        identificacao_layout.addRow("Matrícula:", self.matricula)
-        identificacao_layout.addRow("Marca:", self.marca)
-        identificacao_layout.addRow("ISV:", self.isv)
-        identificacao_layout.addRow("Nº Registo de Contabilidade:", self.nRegistoContabilidade)
-        identificacao_group.setLayout(identificacao_layout)
-
-        compras_group = QGroupBox("Compras")
-        compras_layout = QFormLayout()
-        compras_layout.addRow("Data de Compra:", self.dataCompra)
-        compras_layout.addRow("Documento de Compra:", self.docCompra)
-        compras_layout.addRow("Tipo de Documento:", self.tipoDocumento)
-        compras_layout.addRow("Valor de Compra:", self.valorCompra)
-        compras_group.setLayout(compras_layout)
-
-        vendas_group = QGroupBox("Vendas")
-        vendas_layout = QFormLayout()
-        vendas_layout.addRow("Data de Venda:", self.dataVenda)
-        vendas_layout.addRow("Documento de Venda:", self.docVenda)
-        vendas_layout.addRow("Valor Venda:", self.valorVenda)
-        vendas_group.setLayout(vendas_layout)
-
         self.imposto = QLineEdit()
         self.taxa = QLineEdit()
 
@@ -143,7 +131,30 @@ class AddExpenseDialog(QDialog):
         imposto_layout.addRow("Taxa:", self.taxa)
         imposto_group.setLayout(imposto_layout)
 
-        # Layout principal
+        # Layout principal - Adicionar os grupos de campos aqui
+        identificacao_group = QGroupBox("Identificação do Veículo")
+        identificacao_layout = QFormLayout()
+        identificacao_layout.addRow("Matrícula:", self.matricula)
+        identificacao_layout.addRow("Marca:", self.marca)
+        identificacao_layout.addRow("ISV:", self.isv)
+        identificacao_layout.addRow("Nº Registo Contabilidade:", self.nRegistoContabilidade)
+        identificacao_group.setLayout(identificacao_layout)
+
+        compras_group = QGroupBox("Detalhes da Compra")
+        compras_layout = QFormLayout()
+        compras_layout.addRow("Data da Compra:", self.dataCompra)
+        compras_layout.addRow("Doc. Compra:", self.docCompra)
+        compras_layout.addRow("Tipo Documento:", self.tipoDocumento)
+        compras_layout.addRow("Valor de Compra:", self.valorCompra)
+        compras_group.setLayout(compras_layout)
+
+        vendas_group = QGroupBox("Detalhes da Venda")
+        vendas_layout = QFormLayout()
+        vendas_layout.addRow("Data da Venda:", self.dataVenda)
+        vendas_layout.addRow("Doc. Venda:", self.docVenda)
+        vendas_layout.addRow("Valor de Venda:", self.valorVenda)
+        vendas_group.setLayout(vendas_layout)
+
         main_layout = QVBoxLayout()
         main_layout.addWidget(identificacao_group)
         main_layout.addWidget(compras_group)
@@ -161,13 +172,130 @@ class AddExpenseDialog(QDialog):
 
     def apply_styles(self):
         if self.parent_window is not None:
-            self.setStyleSheet(self.parent_window.styleSheet())
+            self.setStyleSheet("""
+    /* Base styling */
+    QWidget {
+        background-color: #e3e9f2;
+        font-family: Arial, sans-serif;
+        font-size: 14px;
+        color: #333;
+    }
+
+    /* Headings for labels */
+    QLabel {
+        font-size: 16px;
+        color: #2c3e50;
+        font-weight: bold;
+        padding: 5px;
+    }
+
+    /* Styling for input fields */
+    QLineEdit, QComboBox, QDateEdit {
+        background-color: #ffffff;
+        font-size: 14px;
+        color: #333;
+        border: 1px solid #b0bfc6;
+        border-radius: 5px;
+        padding: 5px;
+    }
+    QLineEdit:hover, QComboBox:hover, QDateEdit:hover {
+        border: 1px solid #4caf50;
+    }
+    QLineEdit:focus, QComboBox:focus, QDateEdit:focus {
+        border: 1px solid #2a9d8f;
+        background-color: #f5f9fc;
+    }
+
+    /* Table styling */
+    QTableWidget {
+        background-color: #ffffff;
+        alternate-background-color: #f2f7fb;
+        gridline-color: #c0c9d0;
+        font-size: 14px;
+        border: 1px solid #cfd9e1;
+    }
+    QTableWidget::item:selected {
+        background-color: #d0d7de;
+        color: #000000;
+    }
+
+    QHeaderView::section {
+        background-color: #4caf50;
+        color: white;
+        font-weight: bold;
+        padding: 4px;
+        border: 1px solid #cfd9e1;
+    }
+
+    /* Scroll bar styling */
+    QScrollBar:vertical {
+        width: 12px;
+        background-color: #f0f0f0;
+        border: none;
+    }
+    QScrollBar::handle:vertical {
+        background-color: #4caf50;
+        min-height: 20px;
+        border-radius: 5px;
+    }
+    QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+        background: none;
+    }
+
+    /* Buttons */
+    QPushButton {
+        background-color: #4caf50;
+        color: white;
+        padding: 10px 15px;
+        border-radius: 5px;
+        font-size: 14px;
+        font-weight: bold;
+        transition: background-color 0.3s;
+    }
+    QPushButton:hover {
+        background-color: #45a049;
+    }
+    QPushButton:pressed {
+        background-color: #3d8b40;
+    }
+    QPushButton:disabled {
+        background-color: #c8c8c8;
+        color: #6e6e6e;
+    }
+
+    /* Tooltip styling */
+    QToolTip {
+        background-color: #2c3e50;
+        color: #ffffff;
+        border: 1px solid #333;
+        font-size: 12px;
+        padding: 5px;
+        border-radius: 4px;
+    }
+""")
 
     def add_record(self):
         try:
-            isv = float(self.isv.text().replace(",", ".")) if self.isv.text() else None
-            valor_compra = float(self.valorCompra.text().replace(",", ".")) if self.valorCompra.text() else None
-            valor_venda = float(self.valorVenda.text().replace(",", ".")) if self.valorVenda.text() else None
+            # Função auxiliar para lidar com a conversão e arredondamento
+            def get_float_value(lineEdit_text):
+                # Remove espaços em branco e substitui vírgulas por pontos
+                text = lineEdit_text.replace(",", ".").strip()
+                if text:
+                    try:
+                        return round(float(text), 2)
+                    except ValueError:
+                        # Se a conversão falhar (ex: texto não numérico), retorna None
+                        return None
+                return None  # Retorna None se o campo estiver vazio
+
+            isv = get_float_value(self.isv.text())
+            # nRegistoContabilidade pode ser TEXT no DB, mas se for para ser um número, converta
+            # Se for sempre TEXT, remova esta conversão e a chamada a get_float_value para ele
+            nRegistoContabilidade = self.nRegistoContabilidade.text()  # Mantido como string
+            valor_compra = get_float_value(self.valorCompra.text())
+            valor_venda = get_float_value(self.valorVenda.text())
+            imposto = get_float_value(self.imposto.text())
+            taxa = get_float_value(self.taxa.text())
 
             data_compra_str = self.dataCompra.date().toString("yyyy-MM-dd")
             data_venda_str = self.dataVenda.date().toString("yyyy-MM-dd")
@@ -178,15 +306,12 @@ class AddExpenseDialog(QDialog):
             elif self.regime_lucro_tributavel_radio.isChecked():
                 regime_fiscal = "Margem"
 
-            imposto = float(self.imposto.text().replace(",", ".")) if self.imposto.text() else None
-            taxa = float(self.taxa.text().replace(",", ".")) if self.taxa.text() else None
-
             if self.mode == "edit":
                 success = update_expense_in_db(self.initial_data["id"], {
                     "matricula": self.matricula.text(),
                     "marca": self.marca.text(),
                     "isv": isv,
-                    "nRegistoContabilidade": self.nRegistoContabilidade.text(),
+                    "nRegistoContabilidade": nRegistoContabilidade,  # Passa como string
                     "dataCompra": data_compra_str,
                     "docCompra": self.docCompra.text(),
                     "tipoDocumento": self.tipoDocumento.currentText(),
@@ -196,14 +321,14 @@ class AddExpenseDialog(QDialog):
                     "valorVenda": valor_venda,
                     "imposto": imposto,
                     "taxa": taxa,
-                    "regime_fiscal": regime_fiscal # Já estava correto aqui
+                    "regime_fiscal": regime_fiscal
                 })
             else:
                 print("\n--- Argumentos passados para add_expense_to_db ---")
                 print(f"matricula: {self.matricula.text()}")
                 print(f"marca: {self.marca.text()}")
                 print(f"isv: {isv}")
-                print(f"nRegistoContabilidade: {self.nRegistoContabilidade.text()}")
+                print(f"nRegistoContabilidade: {nRegistoContabilidade}")
                 print(f"dataCompra: {data_compra_str}")
                 print(f"docCompra: {self.docCompra.text()}")
                 print(f"tipoDocumento: {self.tipoDocumento.currentText()}")
@@ -218,10 +343,11 @@ class AddExpenseDialog(QDialog):
 
                 success = add_expense_to_db(
                     self.matricula.text(), self.marca.text(), isv,
-                    self.nRegistoContabilidade.text(), data_compra_str, self.docCompra.text(),
+                    nRegistoContabilidade,  # Passa como string
+                    data_compra_str, self.docCompra.text(),
                     self.tipoDocumento.currentText(), valor_compra, data_venda_str,
-                    self.docVenda.text(), valor_venda, self.imposto.text(), self.taxa.text(),
-                    regime_fiscal  # Esta linha é CRÍTICA
+                    self.docVenda.text(), valor_venda, imposto, taxa,
+                    regime_fiscal
                 )
 
             if success:
@@ -236,7 +362,7 @@ class AddExpenseDialog(QDialog):
             import traceback
             traceback.print_exc()
 
-    def closeEvent(self, event):  # Garante que a opacidade volta ao normal
+    def closeEvent(self, event):
         if self.parent_window is not None:
             self.parent_window.setGraphicsEffect(None)
         event.accept()
@@ -255,37 +381,37 @@ class ExpenseApp(QWidget):
         self.add_button = QPushButton("Add Expense")
         self.delete_button = QPushButton("Delete Expense")
 
+        # Ajustado para incluir 7 colunas visíveis na tabela principal inicialmente
+        # ID (0), Matrícula (1), Marca (2), Valor de Compra (3), Doc Venda (4), Valor Venda (5), Imposto (6)
+        # Se quiseres a Taxa visível aqui, terás que adicionar mais uma coluna e ajustar os labels e a query fetch_expenses
         self.table = QTableWidget(0, 7)
         self.table.setHorizontalHeaderLabels(
             ["ID", "Matrícula", "Marca", "Valor de Compra", "Documento de Venda", "Valor de Venda", "Imposto"]
         )
-        self.table.setColumnHidden(0, True)  # Hide ID column
+        self.table.setColumnHidden(0, True)  # Oculta a coluna ID
         self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.table.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self.table.cellDoubleClicked.connect(self.open_edit_expense_dialog)
 
-        # Connect Buttons to Methods
         self.add_button.clicked.connect(self.show_add_expense_dialog)
         self.delete_button.clicked.connect(self.delete_expense)
 
-        # Setup Layouts
         self.setup_layout()
 
-        # Apply Styling
         self.apply_styles()
 
     def show_add_expense_dialog(self):
-        self.add_expense_dialog = AddExpenseDialog(self)  # Passa a janela principal como parent
+        self.add_expense_dialog = AddExpenseDialog(self)
         opacity_effect = QGraphicsOpacityEffect()
-        opacity_effect.setOpacity(0.5)  # Define a opacidade
-        self.setGraphicsEffect(opacity_effect)  # Aplica o efeito
-        self.add_expense_dialog.exec()  # Usamos exec() para modalidade
+        opacity_effect.setOpacity(0.5)
+        self.setGraphicsEffect(opacity_effect)
+        self.add_expense_dialog.exec()
 
     def open_edit_expense_dialog(self, row, column):
-        vehicle_id = int(self.table.item(row, 0).text())  # Get the ID from the hidden column
-        initial_data = fetch_vehicle_by_id(vehicle_id) # Fetch all data
+        vehicle_id = int(self.table.item(row, 0).text())
+        initial_data = fetch_vehicle_by_id(vehicle_id)
 
         if initial_data:
             dialog = AddExpenseDialog(self, mode="edit", initial_data=initial_data)
@@ -300,11 +426,9 @@ class ExpenseApp(QWidget):
         layout = QVBoxLayout()
         row1 = QHBoxLayout()
 
-        # Row 3 (Buttons)
         row1.addWidget(self.add_button)
         row1.addWidget(self.delete_button)
 
-        # Add rows to main layout
         layout.addLayout(row1)
         layout.addWidget(self.table)
 
@@ -354,8 +478,8 @@ class ExpenseApp(QWidget):
         border: 1px solid #cfd9e1;
     }
     QTableWidget::item:selected {
-        background-color: #d0d7de; /* Cinzento claro visível */
-        color: #000000; /* Texto preto legível */
+        background-color: #d0d7de;
+        color: #000000;
     }
 
     QHeaderView::section {
@@ -419,7 +543,22 @@ class ExpenseApp(QWidget):
         for row_idx, expense in enumerate(expenses):
             self.table.insertRow(row_idx)
             for col_idx, data in enumerate(expense):
-                self.table.setItem(row_idx, col_idx, QTableWidgetItem(str(data)))
+                # Formata colunas específicas com duas casas decimais se forem numéricas
+                # Colunas: 3 (Valor Compra), 5 (Valor Venda), 6 (Imposto)
+                if col_idx in [3, 5, 6]:
+                    try:
+                        # Se o dado for None ou string vazia, exibe string vazia
+                        if data is None or (isinstance(data, str) and not str(data).strip()):
+                            formatted_data = ""
+                        else:
+                            # Assegura que o dado é tratado como float antes de formatar
+                            formatted_data = f"{float(data):.2f}".replace('.', ',')
+                        self.table.setItem(row_idx, col_idx, QTableWidgetItem(formatted_data))
+                    except (ValueError, TypeError):
+                        # Se não for um número válido, exibe como string
+                        self.table.setItem(row_idx, col_idx, QTableWidgetItem(str(data)))
+                else:
+                    self.table.setItem(row_idx, col_idx, QTableWidgetItem(str(data)))
 
     def delete_expense(self):
         selected_row = self.table.currentRow()
@@ -434,10 +573,12 @@ class ExpenseApp(QWidget):
         if confirm == QMessageBox.StandardButton.Yes:
             if delete_expense_from_db(expense_id):
                 self.load_table_data()
-                self.table.clearSelection()  # Deselect after deleting
+                self.table.clearSelection()  # Deselects the row after deletion
 
     def clear_inputs(self):
-        self.date_box.setDate(QDate.currentDate())
-        self.dropdown.setCurrentIndex(0)
-        self.amount.clear()
-        self.description.clear()
+        # Estes campos não estão definidos nesta classe, verificar se são necessários
+        # self.date_box.setDate(QDate.currentDate())
+        # self.dropdown.setCurrentIndex(0)
+        # self.amount.clear()
+        # self.description.clear()
+        pass
