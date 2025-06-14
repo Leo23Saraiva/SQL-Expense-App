@@ -329,6 +329,16 @@ class AddExpenseDialog(QDialog):
         background-color: #4caf50; /* Preenchimento verde quando selecionado */
         border: 2px solid #2a9d8f; /* Borda verde mais escura quando selecionado */
     }
+
+    /* NOVO ESTILO: QRadioButton quando desabilitado */
+    QRadioButton:disabled {
+        color: #a0a0a0; /* Cor do texto cinzento */
+    }
+
+    QRadioButton::indicator:disabled {
+        background-color: #e0e0e0; /* Fundo cinzento claro para o indicador */
+        border: 2px solid #b0b0b0; /* Borda cinzenta mais escura */
+    }
 """)
 
     # Função auxiliar para lidar com a conversão e arredondamento (reutilizada)
@@ -727,6 +737,16 @@ class ExpenseApp(QWidget):
     QRadioButton::indicator:checked {
         background-color: #4caf50; /* Preenchimento verde quando selecionado */
         border: 2px solid #2a9d8f; /* Borda verde mais escura quando selecionado */
+    }
+
+    /* NOVO ESTILO: QRadioButton quando desabilitado */
+    QRadioButton:disabled {
+        color: #a0a0a0; /* Cor do texto cinzento */
+    }
+
+    QRadioButton::indicator:disabled {
+        background-color: #e0e0e0; /* Fundo cinzento claro para o indicador */
+        border: 2px solid #b0b0b0; /* Borda cinzenta mais escura */
     }
 """)
 
