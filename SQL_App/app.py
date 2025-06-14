@@ -24,14 +24,20 @@ class AddExpenseDialog(QDialog):
         self.regime_geral_radio.setEnabled(False)
         self.regime_lucro_tributavel_radio.setEnabled(False)
 
-        # Conectar os sinais textChanged dos campos relevantes
+        # Conectar os sinais textChanged dos campos relevantes para atualizar estados e CÁLCULOS
         self.valorCompra.textChanged.connect(self.update_regime_button_states)
+        self.valorCompra.textChanged.connect(self.calculate_regime_fields)
         self.valorVenda.textChanged.connect(self.update_regime_button_states)
+        self.valorVenda.textChanged.connect(self.calculate_regime_fields)
         self.imposto.textChanged.connect(self.update_regime_button_states)
+        self.imposto.textChanged.connect(self.calculate_regime_fields)
 
-        # Conectar o sinal clicked dos radio buttons (para capturar a seleção real)
+
+        # Conectar o sinal clicked dos radio buttons (para capturar a seleção real e disparar cálculo)
         self.regime_geral_radio.clicked.connect(self.handle_regime_selection)
+        self.regime_geral_radio.clicked.connect(self.calculate_regime_fields)
         self.regime_lucro_tributavel_radio.clicked.connect(self.handle_regime_selection)
+        self.regime_lucro_tributavel_radio.clicked.connect(self.calculate_regime_fields)
 
         # Variável para armazenar o QRadioButton que estava selecionado por último de forma válida
         # Será None se nenhum estiver selecionado ou se a validação falhar
@@ -39,8 +45,9 @@ class AddExpenseDialog(QDialog):
 
         if self.mode == "edit" and self.initial_data:
             self.populate_fields()
-            # Após popular os campos, atualiza o estado dos radio buttons
+            # Após popular os campos, atualiza o estado dos radio buttons e, se aplicável, recalcula
             self.update_regime_button_states()
+            self.calculate_regime_fields()
             # Define o last_valid_regime_radio com base no que foi carregado
             if self.regime_geral_radio.isChecked():
                 self.last_valid_regime_radio = self.regime_geral_radio
@@ -353,16 +360,83 @@ class AddExpenseDialog(QDialog):
                 return None
         return None  # Retorna None se o campo estiver vazio
 
-    def are_general_regime_fields_valid(self):
+    # Validação para o Regime Normal (Valor de Venda e Imposto)
+    def are_normal_regime_fields_valid(self):
         """Verifica se os campos necessários para 'Regime Normal' estão preenchidos."""
+        return (self.get_float_value(self.valorVenda.text()) is not None and
+                self.get_float_value(self.imposto.text()) is not None)
+
+    # Validação para o Regime de Margem (Valor de Compra, Valor de Venda e Imposto)
+    def are_margin_regime_fields_valid(self):
+        """Verifica se os campos necessários para 'Margem' estão preenchidos."""
         return (self.get_float_value(self.valorCompra.text()) is not None and
                 self.get_float_value(self.valorVenda.text()) is not None and
                 self.get_float_value(self.imposto.text()) is not None)
 
-    def are_margin_regime_fields_valid(self):
-        """Verifica se os campos necessários para 'Margem' estão preenchidos."""
-        return (self.get_float_value(self.valorVenda.text()) is not None and
-                self.get_float_value(self.imposto.text()) is not None)
+
+    def calculate_regime_fields(self):
+        """
+        Calcula automaticamente os campos 'Valor Base' e 'Taxa' com base no regime fiscal selecionado
+        e nos valores de compra, venda e imposto.
+        """
+        # Desabilitamos sinais dos QLineEdit temporariamente para não disparar recursão
+        self.valorBase.blockSignals(True)
+        self.taxa.blockSignals(True)
+
+        try:
+            if self.regime_geral_radio.isChecked() and self.are_normal_regime_fields_valid():
+                # Lógica de cálculo para Regime Normal
+                valor_venda = self.get_float_value(self.valorVenda.text())
+                imposto_percent = self.get_float_value(self.imposto.text())
+
+                if valor_venda is not None and imposto_percent is not None:
+                    # Cálculo para Regime Normal
+                    if (1 + imposto_percent / 100) != 0:
+                        valor_base_calculado = valor_venda / (1 + imposto_percent / 100)
+                        taxa_calculada = valor_base_calculado * 0.23
+                        self.valorBase.setText(f"{valor_base_calculado:.2f}".replace('.', ','))
+                        self.taxa.setText(f"{taxa_calculada:.2f}".replace('.', ','))
+                    else:
+                        self.valorBase.setText("Divisão por Zero")
+                        self.taxa.setText("Erro")
+                else:
+                    self.valorBase.clear()
+                    self.taxa.clear()
+
+            elif self.regime_lucro_tributavel_radio.isChecked() and self.are_margin_regime_fields_valid():
+                # Lógica de cálculo para Regime de Margem
+                valor_venda = self.get_float_value(self.valorVenda.text())
+                valor_compra = self.get_float_value(self.valorCompra.text())
+                imposto_percent = self.get_float_value(self.imposto.text())
+
+                if valor_venda is not None and valor_compra is not None and imposto_percent is not None:
+                    # Cálculo para Regime de Margem
+                    if (1 + imposto_percent / 100) != 0:
+                        margem_bruta = valor_venda - valor_compra
+                        valor_base_calculado = margem_bruta / (1 + imposto_percent / 100)
+                        taxa_calculada = valor_base_calculado * 0.23
+                        self.valorBase.setText(f"{valor_base_calculado:.2f}".replace('.', ','))
+                        self.taxa.setText(f"{taxa_calculada:.2f}".replace('.', ','))
+                    else:
+                        self.valorBase.setText("Divisão por Zero")
+                        self.taxa.setText("Erro")
+                else:
+                    self.valorBase.clear()
+                    self.taxa.clear()
+            else:
+                # Se nenhum regime válido estiver selecionado ou os campos não forem válidos, limpar
+                self.valorBase.clear()
+                self.taxa.clear()
+
+        except Exception as e:
+            print(f"Erro no cálculo de campos: {e}")
+            self.valorBase.clear()
+            self.taxa.clear()
+
+        # Reabilitar sinais dos QLineEdit
+        self.valorBase.blockSignals(False)
+        self.taxa.blockSignals(False)
+
 
     def update_regime_button_states(self):
         """Habilita/desabilita os radio buttons com base na validação dos campos."""
@@ -371,28 +445,15 @@ class AddExpenseDialog(QDialog):
         self.regime_geral_radio.blockSignals(True)
         self.regime_lucro_tributavel_radio.blockSignals(True)
 
-        can_select_general = self.are_general_regime_fields_valid()
+        can_select_normal = self.are_normal_regime_fields_valid()
         can_select_margin = self.are_margin_regime_fields_valid()
 
-        self.regime_geral_radio.setEnabled(can_select_general)
+        self.regime_geral_radio.setEnabled(can_select_normal)
         self.regime_lucro_tributavel_radio.setEnabled(can_select_margin)
 
         # Se o regime atualmente selecionado (last_valid_regime_radio)
         # se tornar inválido, desmarca-o.
-        if self.last_valid_regime_radio == self.regime_geral_radio and not can_select_general:
-            self.regime_geral_radio.setChecked(False)
-            self.last_valid_regime_radio = None
-        elif self.last_valid_regime_radio == self.regime_lucro_tributavel_radio and not can_select_margin:
-            self.regime_lucro_tributavel_radio.setChecked(False)
-            self.last_valid_regime_radio = None
-
-        # Se um regime foi desabilitado e estava selecionado, ele é desmarcado.
-        # Se um regime que estava selecionado se tornou inválido, precisamos garantir que ele não fica marcado
-        # E que o last_valid_regime_radio é resetado.
-
-        # Verificamos se o radio button que está CURRENTEMENTE marcado ainda é válido.
-        # Se não for, desmarcamo-lo e limpamos last_valid_regime_radio.
-        if self.regime_geral_radio.isChecked() and not can_select_general:
+        if self.regime_geral_radio.isChecked() and not can_select_normal:
             self.regime_geral_radio.setChecked(False)
             self.last_valid_regime_radio = None
 
@@ -400,12 +461,27 @@ class AddExpenseDialog(QDialog):
             self.regime_lucro_tributavel_radio.setChecked(False)
             self.last_valid_regime_radio = None
 
-        # Se nenhum radio button estiver selecionado E AMBOS forem válidos,
-        # e o último válido é None, não fazemos nada. O utilizador terá de selecionar.
-        # Se um era válido e agora é inválido, ele já foi desmarcado acima.
+        # Re-marcar o último regime válido se ele ainda for válido
+        if self.last_valid_regime_radio == self.regime_geral_radio and can_select_normal:
+            self.regime_geral_radio.setChecked(True)
+        elif self.last_valid_regime_radio == self.regime_lucro_tributavel_radio and can_select_margin:
+            self.regime_lucro_tributavel_radio.setChecked(True)
+        else:
+            # Se o último regime válido não puder ser re-marcado (tornou-se inválido),
+            # ou se não havia last_valid_regime_radio e nenhum está marcado,
+            # garante que nenhum radio está marcado e que o cálculo é limpo.
+            if not self.regime_geral_radio.isChecked() and not self.regime_lucro_tributavel_radio.isChecked():
+                self.valorBase.clear()
+                self.taxa.clear()
+
 
         self.regime_geral_radio.blockSignals(False)
         self.regime_lucro_tributavel_radio.blockSignals(False)
+
+        # Após atualizar os estados dos botões (e possivelmente desmarcar um radio),
+        # Dispara o cálculo novamente para garantir que os campos de imposto são atualizados.
+        self.calculate_regime_fields()
+
 
     def handle_regime_selection(self):
         """
@@ -425,6 +501,9 @@ class AddExpenseDialog(QDialog):
             # Isso é mais uma salvaguarda, pois last_valid_regime_radio deve sempre apontar para o marcado.
             if self.last_valid_regime_radio == sender_radio:
                 self.last_valid_regime_radio = None
+
+        # Dispara o cálculo assim que um regime é selecionado
+        self.calculate_regime_fields()
 
     def validate_all_fields_for_save(self):
         missing_fields = []
@@ -450,15 +529,15 @@ class AddExpenseDialog(QDialog):
             current_regime_selected = "Margem"
 
         if current_regime_selected == "Regime Normal":
-            if not self.are_general_regime_fields_valid():
+            if not self.are_normal_regime_fields_valid():
                 QMessageBox.warning(self, "Campos em Falta para Regime Normal",
-                                    "Por favor, preencha 'Valor de Compra', 'Valor de Venda' e 'Imposto' para o Regime Normal.")
+                                    "Por favor, preencha 'Valor de Venda' e 'Imposto' para o Regime Normal.")
                 return False
 
         elif current_regime_selected == "Margem":
             if not self.are_margin_regime_fields_valid():
                 QMessageBox.warning(self, "Campos em Falta para Regime Margem",
-                                    "Por favor, preencha 'Valor de Venda' e 'Imposto' para o Regime Margem.")
+                                    "Por favor, preencha 'Valor de Compra', 'Valor de Venda' e 'Imposto' para o Regime Margem.")
                 return False
 
         return True
