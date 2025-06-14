@@ -76,8 +76,9 @@ class AddExpenseDialog(QDialog):
         self.docVenda.setText(self.initial_data.get("docVenda", ""))
         self.valorVenda.setText(format_real_for_display(self.initial_data.get("valorVenda")))
 
-        # Aplicar a função de formatação para imposto e taxa
+        # Aplicar a função de formatação para imposto, valorBase e taxa
         self.imposto.setText(format_real_for_display(self.initial_data.get("imposto")))
+        self.valorBase.setText(format_real_for_display(self.initial_data.get("valorBase")))  # RENOMEADO AQUI
         self.taxa.setText(format_real_for_display(self.initial_data.get("taxa")))
 
         regime_salvo = self.initial_data.get("regime_fiscal", "")
@@ -112,6 +113,7 @@ class AddExpenseDialog(QDialog):
         self.valorVenda = QLineEdit()
 
         self.imposto = QLineEdit()
+        self.valorBase = QLineEdit()  # RENOMEADO AQUI
         self.taxa = QLineEdit()
 
         # NOVOS CAMPOS: Checkboxes para o Regime Fiscal
@@ -128,6 +130,7 @@ class AddExpenseDialog(QDialog):
         imposto_layout = QFormLayout()
         imposto_layout.addRow("Regime Fiscal:", regime_layout)
         imposto_layout.addRow("Imposto:", self.imposto)
+        imposto_layout.addRow("Valor Base:", self.valorBase)  # RENOMEADO O LABEL AQUI
         imposto_layout.addRow("Taxa:", self.taxa)
         imposto_group.setLayout(imposto_layout)
 
@@ -289,12 +292,12 @@ class AddExpenseDialog(QDialog):
                 return None  # Retorna None se o campo estiver vazio
 
             isv = get_float_value(self.isv.text())
-            # nRegistoContabilidade pode ser TEXT no DB, mas se for para ser um número, converta
-            # Se for sempre TEXT, remova esta conversão e a chamada a get_float_value para ele
-            nRegistoContabilidade = self.nRegistoContabilidade.text()  # Mantido como string
+            # nRegistoContabilidade é mantido como string
+            nRegistoContabilidade = self.nRegistoContabilidade.text()
             valor_compra = get_float_value(self.valorCompra.text())
             valor_venda = get_float_value(self.valorVenda.text())
             imposto = get_float_value(self.imposto.text())
+            valorBase = get_float_value(self.valorBase.text())  # O valor já vem do campo self.valorBase
             taxa = get_float_value(self.taxa.text())
 
             data_compra_str = self.dataCompra.date().toString("yyyy-MM-dd")
@@ -311,7 +314,7 @@ class AddExpenseDialog(QDialog):
                     "matricula": self.matricula.text(),
                     "marca": self.marca.text(),
                     "isv": isv,
-                    "nRegistoContabilidade": nRegistoContabilidade,  # Passa como string
+                    "nRegistoContabilidade": nRegistoContabilidade,
                     "dataCompra": data_compra_str,
                     "docCompra": self.docCompra.text(),
                     "tipoDocumento": self.tipoDocumento.currentText(),
@@ -320,6 +323,7 @@ class AddExpenseDialog(QDialog):
                     "docVenda": self.docVenda.text(),
                     "valorVenda": valor_venda,
                     "imposto": imposto,
+                    "valorBase": valorBase,  # Adicionado aqui
                     "taxa": taxa,
                     "regime_fiscal": regime_fiscal
                 })
@@ -337,16 +341,17 @@ class AddExpenseDialog(QDialog):
                 print(f"docVenda: {self.docVenda.text()}")
                 print(f"valorVenda: {valor_venda}")
                 print(f"imposto: {imposto}")
+                print(f"valorBase: {valorBase}")  # Adicionado aqui
                 print(f"taxa: {taxa}")
                 print(f"regime_fiscal: {regime_fiscal}")
                 print("--- Fim dos Argumentos ---")
 
                 success = add_expense_to_db(
                     self.matricula.text(), self.marca.text(), isv,
-                    nRegistoContabilidade,  # Passa como string
+                    nRegistoContabilidade,
                     data_compra_str, self.docCompra.text(),
                     self.tipoDocumento.currentText(), valor_compra, data_venda_str,
-                    self.docVenda.text(), valor_venda, imposto, taxa,
+                    self.docVenda.text(), valor_venda, imposto, valorBase, taxa,  # Adicionado 'valorBase' aqui
                     regime_fiscal
                 )
 
@@ -381,9 +386,7 @@ class ExpenseApp(QWidget):
         self.add_button = QPushButton("Add Expense")
         self.delete_button = QPushButton("Delete Expense")
 
-        # Ajustado para incluir 7 colunas visíveis na tabela principal inicialmente
-        # ID (0), Matrícula (1), Marca (2), Valor de Compra (3), Doc Venda (4), Valor Venda (5), Imposto (6)
-        # Se quiseres a Taxa visível aqui, terás que adicionar mais uma coluna e ajustar os labels e a query fetch_expenses
+        # Mantemos as 7 colunas visíveis na tabela principal
         self.table = QTableWidget(0, 7)
         self.table.setHorizontalHeaderLabels(
             ["ID", "Matrícula", "Marca", "Valor de Compra", "Documento de Venda", "Valor de Venda", "Imposto"]
@@ -545,6 +548,7 @@ class ExpenseApp(QWidget):
             for col_idx, data in enumerate(expense):
                 # Formata colunas específicas com duas casas decimais se forem numéricas
                 # Colunas: 3 (Valor Compra), 5 (Valor Venda), 6 (Imposto)
+                # O campo 'valorBase' NÃO está aqui
                 if col_idx in [3, 5, 6]:
                     try:
                         # Se o dado for None ou string vazia, exibe string vazia
