@@ -20,8 +20,32 @@ class AddExpenseDialog(QDialog):
         self.init_ui()
         self.apply_styles()
 
+        # Desabilitar os radio buttons por defeito
+        self.regime_geral_radio.setEnabled(False)
+        self.regime_lucro_tributavel_radio.setEnabled(False)
+
+        # Conectar os sinais textChanged dos campos relevantes
+        self.valorCompra.textChanged.connect(self.update_regime_button_states)
+        self.valorVenda.textChanged.connect(self.update_regime_button_states)
+        self.imposto.textChanged.connect(self.update_regime_button_states)
+
+        # Conectar o sinal clicked dos radio buttons (para capturar a seleção real)
+        self.regime_geral_radio.clicked.connect(self.handle_regime_selection)
+        self.regime_lucro_tributavel_radio.clicked.connect(self.handle_regime_selection)
+
+        # Variável para armazenar o QRadioButton que estava selecionado por último de forma válida
+        # Será None se nenhum estiver selecionado ou se a validação falhar
+        self.last_valid_regime_radio = None
+
         if self.mode == "edit" and self.initial_data:
             self.populate_fields()
+            # Após popular os campos, atualiza o estado dos radio buttons
+            self.update_regime_button_states()
+            # Define o last_valid_regime_radio com base no que foi carregado
+            if self.regime_geral_radio.isChecked():
+                self.last_valid_regime_radio = self.regime_geral_radio
+            elif self.regime_lucro_tributavel_radio.isChecked():
+                self.last_valid_regime_radio = self.regime_lucro_tributavel_radio
 
     def populate_fields(self):
         # Usar .get() com um valor padrão para evitar KeyError e TypeError se o valor for None
@@ -73,13 +97,17 @@ class AddExpenseDialog(QDialog):
         else:
             self.dataVenda.setDate(QDate.currentDate())  # Define uma data padrão se não houver data
 
-        self.docVenda.setText(format_real_for_display(self.initial_data.get("docVenda")))
+        self.docVenda.setText(self.initial_data.get("docVenda", ""))  # Correção: docVenda é texto
         self.valorVenda.setText(format_real_for_display(self.initial_data.get("valorVenda")))
 
         # Aplicar a função de formatação para imposto, valorBase e taxa
         self.imposto.setText(format_real_for_display(self.initial_data.get("imposto")))
         self.valorBase.setText(format_real_for_display(self.initial_data.get("valorBase")))
         self.taxa.setText(format_real_for_display(self.initial_data.get("taxa")))
+
+        # Carregar o regime fiscal salvo, desabilitando sinais para não disparar handle_regime_selection
+        self.regime_geral_radio.blockSignals(True)
+        self.regime_lucro_tributavel_radio.blockSignals(True)
 
         regime_salvo = self.initial_data.get("regime_fiscal", "")
         if regime_salvo == "Regime Normal":
@@ -89,6 +117,9 @@ class AddExpenseDialog(QDialog):
         else:
             self.regime_geral_radio.setChecked(False)
             self.regime_lucro_tributavel_radio.setChecked(False)
+
+        self.regime_geral_radio.blockSignals(False)
+        self.regime_lucro_tributavel_radio.blockSignals(False)
 
     def init_ui(self):
         self.setWindowTitle("MBAuto - Detalhes")
@@ -300,600 +331,141 @@ class AddExpenseDialog(QDialog):
     }
 """)
 
-    def add_record(self):
-        try:
-            # Função auxiliar para lidar com a conversão e arredondamento
-            def get_float_value(lineEdit_text):
-                # Remove espaços em branco e substitui vírgulas por pontos
-                text = lineEdit_text.replace(",", ".").strip()
-                if text:
-                    try:
-                        return round(float(text), 2)
-                    except ValueError:
-                        # Se a conversão falhar (ex: texto não numérico), retorna None
-                        return None
-                return None  # Retorna None se o campo estiver vazio
+    # Função auxiliar para lidar com a conversão e arredondamento (reutilizada)
+    def get_float_value(self, lineEdit_text):
+        # Remove espaços em branco e substitui vírgulas por pontos
+        text = lineEdit_text.replace(",", ".").strip()
+        if text:
+            try:
+                return round(float(text), 2)
+            except ValueError:
+                # Se a conversão falhar (ex: texto não numérico), retorna None
+                return None
+        return None  # Retorna None se o campo estiver vazio
 
-            isv = get_float_value(self.isv.text())
-            # nRegistoContabilidade é mantido como string
-            nRegistoContabilidade = self.nRegistoContabilidade.text()
-            valor_compra = get_float_value(self.valorCompra.text())
-            valor_venda = get_float_value(self.valorVenda.text())
-            imposto = get_float_value(self.imposto.text())
-            valorBase = get_float_value(self.valorBase.text())
-            taxa = get_float_value(self.taxa.text())
+    def are_general_regime_fields_valid(self):
+        """Verifica se os campos necessários para 'Regime Normal' estão preenchidos."""
+        return (self.get_float_value(self.valorCompra.text()) is not None and
+                self.get_float_value(self.valorVenda.text()) is not None and
+                self.get_float_value(self.imposto.text()) is not None)
 
-            data_compra_str = self.dataCompra.date().toString("yyyy-MM-dd")
-            data_venda_str = self.dataVenda.date().toString("yyyy-MM-dd")
+    def are_margin_regime_fields_valid(self):
+        """Verifica se os campos necessários para 'Margem' estão preenchidos."""
+        return (self.get_float_value(self.valorVenda.text()) is not None and
+                self.get_float_value(self.imposto.text()) is not None)
 
-            regime_fiscal = ""
-            if self.regime_geral_radio.isChecked():
-                regime_fiscal = "Regime Normal"
-            elif self.regime_lucro_tributavel_radio.isChecked():
-                regime_fiscal = "Margem"
+    def update_regime_button_states(self):
+        """Habilita/desabilita os radio buttons com base na validação dos campos."""
 
-            if self.mode == "edit":
-                success = update_expense_in_db(self.initial_data["id"], {
-                    "matricula": self.matricula.text(),
-                    "marca": self.marca.text(),
-                    "isv": isv,
-                    "nRegistoContabilidade": nRegistoContabilidade,
-                    "dataCompra": data_compra_str,
-                    "docCompra": self.docCompra.text(),
-                    "tipoDocumento": self.tipoDocumento.currentText(),
-                    "valorCompra": valor_compra,
-                    "dataVenda": data_venda_str,
-                    "docVenda": self.docVenda.text(),
-                    "valorVenda": valor_venda,
-                    "imposto": imposto,
-                    "valorBase": valorBase,
-                    "taxa": taxa,
-                    "regime_fiscal": regime_fiscal
-                })
-            else:
-                print("\n--- Argumentos passados para add_expense_to_db ---")
-                print(f"matricula: {self.matricula.text()}")
-                print(f"marca: {self.marca.text()}")
-                print(f"isv: {isv}")
-                print(f"nRegistoContabilidade: {nRegistoContabilidade}")
-                print(f"dataCompra: {data_compra_str}")
-                print(f"docCompra: {self.docCompra.text()}")
-                print(f"tipoDocumento: {self.tipoDocumento.currentText()}")
-                print(f"valorCompra: {valor_compra}")
-                print(f"dataVenda: {data_venda_str}")
-                print(f"docVenda: {self.docVenda.text()}")
-                print(f"valorVenda: {valor_venda}")
-                print(f"imposto: {imposto}")
-                print(f"valorBase: {valorBase}")
-                print(f"taxa: {taxa}")
-                print(f"regime_fiscal: {regime_fiscal}")
-                print("--- Fim dos Argumentos ---")
+        # Desabilitamos os sinais dos radio buttons para evitar loops ou seleção automática indesejada
+        self.regime_geral_radio.blockSignals(True)
+        self.regime_lucro_tributavel_radio.blockSignals(True)
 
-                success = add_expense_to_db(
-                    self.matricula.text(), self.marca.text(), isv,
-                    nRegistoContabilidade,
-                    data_compra_str, self.docCompra.text(),
-                    self.tipoDocumento.currentText(), valor_compra, data_venda_str,
-                    self.docVenda.text(), valor_venda, imposto, valorBase, taxa,
-                    regime_fiscal
-                )
+        can_select_general = self.are_general_regime_fields_valid()
+        can_select_margin = self.are_margin_regime_fields_valid()
 
-            if success:
-                self.close()
-                self.parent_window.load_table_data()
-                QMessageBox.information(self, "Sucesso", "Registo guardado com sucesso!")
-            else:
-                QMessageBox.critical(self, "Erro", "Erro ao guardar registo")
+        self.regime_geral_radio.setEnabled(can_select_general)
+        self.regime_lucro_tributavel_radio.setEnabled(can_select_margin)
 
-        except Exception as e:
-            QMessageBox.critical(self, "Erro", f"Ocorreu um erro: {e}")
-            import traceback
-            traceback.print_exc()
+        # Se o regime atualmente selecionado (last_valid_regime_radio)
+        # se tornar inválido, desmarca-o.
+        if self.last_valid_regime_radio == self.regime_geral_radio and not can_select_general:
+            self.regime_geral_radio.setChecked(False)
+            self.last_valid_regime_radio = None
+        elif self.last_valid_regime_radio == self.regime_lucro_tributavel_radio and not can_select_margin:
+            self.regime_lucro_tributavel_radio.setChecked(False)
+            self.last_valid_regime_radio = None
 
-    def closeEvent(self, event):
-        if self.parent_window is not None:
-            self.parent_window.setGraphicsEffect(None)
-        event.accept()
+        # Se um regime foi desabilitado e estava selecionado, ele é desmarcado.
+        # Se um regime que estava selecionado se tornou inválido, precisamos garantir que ele não fica marcado
+        # E que o last_valid_regime_radio é resetado.
 
+        # Verificamos se o radio button que está CURRENTEMENTE marcado ainda é válido.
+        # Se não for, desmarcamo-lo e limpamos last_valid_regime_radio.
+        if self.regime_geral_radio.isChecked() and not can_select_general:
+            self.regime_geral_radio.setChecked(False)
+            self.last_valid_regime_radio = None
 
-class ExpenseApp(QWidget):
-    def __init__(self):
-        super().__init__()
-        self.init_ui()
-        self.load_table_data()
+        if self.regime_lucro_tributavel_radio.isChecked() and not can_select_margin:
+            self.regime_lucro_tributavel_radio.setChecked(False)
+            self.last_valid_regime_radio = None
 
-    def init_ui(self):
-        self.setWindowTitle("MBAuto")
-        self.setWindowState(Qt.WindowState.WindowMaximized)
+        # Se nenhum radio button estiver selecionado E AMBOS forem válidos,
+        # e o último válido é None, não fazemos nada. O utilizador terá de selecionar.
+        # Se um era válido e agora é inválido, ele já foi desmarcado acima.
 
-        self.add_button = QPushButton("Add Expense")
-        self.delete_button = QPushButton("Delete Expense")
+        self.regime_geral_radio.blockSignals(False)
+        self.regime_lucro_tributavel_radio.blockSignals(False)
 
-        # Mantemos as 7 colunas visíveis na tabela principal
-        self.table = QTableWidget(0, 7)
-        self.table.setHorizontalHeaderLabels(
-            ["ID", "Matrícula", "Marca", "Valor de Compra", "Documento de Venda", "Valor de Venda", "Imposto"]
-        )
-        self.table.setColumnHidden(0, True)  # Oculta a coluna ID
-        self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
-        self.table.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
-        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
-        self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
-        self.table.cellDoubleClicked.connect(self.open_edit_expense_dialog)
-
-        self.add_button.clicked.connect(self.show_add_expense_dialog)
-        self.delete_button.clicked.connect(self.delete_expense)
-
-        self.setup_layout()
-
-        self.apply_styles()
-
-    def show_add_expense_dialog(self):
-        self.add_expense_dialog = AddExpenseDialog(self)
-        opacity_effect = QGraphicsOpacityEffect()
-        opacity_effect.setOpacity(0.5)
-        self.setGraphicsEffect(opacity_effect)
-        self.add_expense_dialog.exec()
-
-    def open_edit_expense_dialog(self, row, column):
-        vehicle_id = int(self.table.item(row, 0).text())
-        initial_data = fetch_vehicle_by_id(vehicle_id)
-
-        if initial_data:
-            dialog = AddExpenseDialog(self, mode="edit", initial_data=initial_data)
-            opacity_effect = QGraphicsOpacityEffect()
-            opacity_effect.setOpacity(0.5)
-            self.setGraphicsEffect(opacity_effect)
-            dialog.exec()
+    def handle_regime_selection(self):
+        """
+        Lida com a seleção de um regime fiscal, atualizando last_valid_regime_radio.
+        A validação de campos obrigatórios é feita no update_regime_button_states
+        e na validação final antes de salvar.
+        """
+        sender_radio = self.sender()
+        if sender_radio.isChecked():
+            # Se um radio button foi clicado e está marcado, ele é o novo last_valid_regime_radio.
+            # A validade dos campos já foi verificada pelo update_regime_button_states que habilitou o botão.
+            self.last_valid_regime_radio = sender_radio
+            print(f"Regime selecionado: {sender_radio.text()}")
         else:
-            QMessageBox.critical(self, "Erro", "Não foi possível carregar os dados do veículo.")
+            # Se um radio button foi desmarcado (o que só acontece se o outro for marcado)
+            # e não temos um last_valid_regime_radio atual, então limpamos.
+            # Isso é mais uma salvaguarda, pois last_valid_regime_radio deve sempre apontar para o marcado.
+            if self.last_valid_regime_radio == sender_radio:
+                self.last_valid_regime_radio = None
 
-    def setup_layout(self):
-        layout = QVBoxLayout()
-        row1 = QHBoxLayout()
+    def validate_all_fields_for_save(self):
+        missing_fields = []
 
-        row1.addWidget(self.add_button)
-        row1.addWidget(self.delete_button)
+        # Validações de campos gerais (matrícula, marca, etc.)
+        if not self.matricula.text().strip():
+            missing_fields.append("Matrícula")
+        if not self.marca.text().strip():
+            missing_fields.append("Marca")
+        # Adicione mais validações de campos gerais aqui se necessário
 
-        layout.addLayout(row1)
-        layout.addWidget(self.table)
+        if missing_fields:
+            QMessageBox.warning(self, "Campos Obrigatórios em Falta",
+                                f"Por favor, preencha os seguintes campos obrigatórios:\n\n- " +
+                                "\n- ".join(missing_fields))
+            return False
 
-        self.setLayout(layout)
+        # Valida os campos específicos do regime selecionado APENAS SE FOR SELECIONADO
+        current_regime_selected = None
+        if self.regime_geral_radio.isChecked():
+            current_regime_selected = "Regime Normal"
+        elif self.regime_lucro_tributavel_radio.isChecked():
+            current_regime_selected = "Margem"
 
-    def apply_styles(self):
-        self.setStyleSheet("""
-    /* Base styling */
-    QWidget {
-        background-color: #e3e9f2;
-        font-family: Arial, sans-serif;
-        font-size: 14px;
-        color: #333;
-    }
+        if current_regime_selected == "Regime Normal":
+            if not self.are_general_regime_fields_valid():
+                QMessageBox.warning(self, "Campos em Falta para Regime Normal",
+                                    "Por favor, preencha 'Valor de Compra', 'Valor de Venda' e 'Imposto' para o Regime Normal.")
+                return False
 
-    /* Headings for labels */
-    QLabel {
-        font-size: 16px;
-        color: #2c3e50;
-        font-weight: bold;
-        padding: 5px;
-    }
+        elif current_regime_selected == "Margem":
+            if not self.are_margin_regime_fields_valid():
+                QMessageBox.warning(self, "Campos em Falta para Regime Margem",
+                                    "Por favor, preencha 'Valor de Venda' e 'Imposto' para o Regime Margem.")
+                return False
 
-    /* Styling for input fields */
-    QLineEdit, QComboBox, QDateEdit {
-        background-color: #ffffff;
-        font-size: 14px;
-        color: #333;
-        border: 1px solid #b0bfc6;
-        border-radius: 5px;
-        padding: 5px;
-    }
-    QLineEdit:hover, QComboBox:hover, QDateEdit:hover {
-        border: 1px solid #4caf50; /* Borda verde no hover */
-    }
-    QLineEdit:focus, QComboBox:focus, QDateEdit:focus {
-        border: 1px solid #2a9d8f; /* Borda verde mais escura no focus */
-        background-color: #f5f9fc;
-    }
-
-    /* Table styling */
-    QTableWidget {
-        background-color: #ffffff;
-        alternate-background-color: #f2f7fb;
-        gridline-color: #c0c9d0;
-        font-size: 14px;
-        border: 1px solid #cfd9e1;
-    }
-    QTableWidget::item:selected {
-        background-color: #d0d7de;
-        color: #000000;
-    }
-
-    QHeaderView::section {
-        background-color: #4caf50;
-        color: white;
-        font-weight: bold;
-        padding: 4px;
-        border: 1px solid #cfd9e1;
-    }
-
-    /* Scroll bar styling */
-    QScrollBar:vertical {
-        width: 12px;
-        background-color: #f0f0f0;
-        border: none;
-    }
-    QScrollBar::handle:vertical {
-        background-color: #4caf50;
-        min-height: 20px;
-        border-radius: 5px;
-    }
-    QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
-        background: none;
-    }
-
-    /* Buttons */
-    QPushButton {
-        background-color: #4caf50;
-        color: white;
-        padding: 10px 15px;
-        border-radius: 5px;
-        font-size: 14px;
-        font-weight: bold;
-        transition: background-color 0.3s;
-    }
-    QPushButton:hover {
-        background-color: #45a049;
-    }
-    QPushButton:pressed {
-        background-color: #3d8b40;
-    }
-    QPushButton:disabled {
-        background-color: #c8c8c8;
-        color: #6e6e6e;
-    }
-
-    /* Tooltip styling */
-    QToolTip {
-        background-color: #2c3e50;
-        color: #ffffff;
-        border: 1px solid #333;
-        font-size: 12px;
-        padding: 5px;
-        border-radius: 4px;
-    }
-
-    /* ESTILO PARA QRadioButton */
-    QRadioButton {
-        color: #333; /* Cor do texto mais escura para melhor legibilidade */
-        padding: 4px 0px; /* Mantém o padding */
-    }
-
-    QRadioButton::indicator {
-        width: 16px;
-        height: 16px;
-        border-radius: 8px; /* Mantém o indicador redondo */
-        border: 2px solid #555555; /* Borda mais escura para o indicador (normal) */
-        background-color: #ffffff; /* Fundo branco para o indicador (normal) */
-    }
-
-    QRadioButton::indicator:hover {
-        border: 2px solid #4caf50; /* Borda verde mais escura no hover */
-    }
-
-    QRadioButton::indicator:checked {
-        background-color: #4caf50; /* Preenchimento verde quando selecionado */
-        border: 2px solid #2a9d8f; /* Borda verde mais escura quando selecionado */
-    }
-""")
+        return True
 
     def add_record(self):
+        # Antes de adicionar/atualizar, chamar a validação final
+        if not self.validate_all_fields_for_save():
+            return  # Se a validação falhar, não prossegue com a gravação
+
         try:
-            # Função auxiliar para lidar com a conversão e arredondamento
-            def get_float_value(lineEdit_text):
-                # Remove espaços em branco e substitui vírgulas por pontos
-                text = lineEdit_text.replace(",", ".").strip()
-                if text:
-                    try:
-                        return round(float(text), 2)
-                    except ValueError:
-                        # Se a conversão falhar (ex: texto não numérico), retorna None
-                        return None
-                return None  # Retorna None se o campo estiver vazio
-
-            isv = get_float_value(self.isv.text())
-            # nRegistoContabilidade é mantido como string
+            isv = self.get_float_value(self.isv.text())
             nRegistoContabilidade = self.nRegistoContabilidade.text()
-            valor_compra = get_float_value(self.valorCompra.text())
-            valor_venda = get_float_value(self.valorVenda.text())
-            imposto = get_float_value(self.imposto.text())
-            valorBase = get_float_value(self.valorBase.text())
-            taxa = get_float_value(self.taxa.text())
-
-            data_compra_str = self.dataCompra.date().toString("yyyy-MM-dd")
-            data_venda_str = self.dataVenda.date().toString("yyyy-MM-dd")
-
-            regime_fiscal = ""
-            if self.regime_geral_radio.isChecked():
-                regime_fiscal = "Regime Normal"
-            elif self.regime_lucro_tributavel_radio.isChecked():
-                regime_fiscal = "Margem"
-
-            if self.mode == "edit":
-                success = update_expense_in_db(self.initial_data["id"], {
-                    "matricula": self.matricula.text(),
-                    "marca": self.marca.text(),
-                    "isv": isv,
-                    "nRegistoContabilidade": nRegistoContabilidade,
-                    "dataCompra": data_compra_str,
-                    "docCompra": self.docCompra.text(),
-                    "tipoDocumento": self.tipoDocumento.currentText(),
-                    "valorCompra": valor_compra,
-                    "dataVenda": data_venda_str,
-                    "docVenda": self.docVenda.text(),
-                    "valorVenda": valor_venda,
-                    "imposto": imposto,
-                    "valorBase": valorBase,
-                    "taxa": taxa,
-                    "regime_fiscal": regime_fiscal
-                })
-            else:
-                print("\n--- Argumentos passados para add_expense_to_db ---")
-                print(f"matricula: {self.matricula.text()}")
-                print(f"marca: {self.marca.text()}")
-                print(f"isv: {isv}")
-                print(f"nRegistoContabilidade: {nRegistoContabilidade}")
-                print(f"dataCompra: {data_compra_str}")
-                print(f"docCompra: {self.docCompra.text()}")
-                print(f"tipoDocumento: {self.tipoDocumento.currentText()}")
-                print(f"valorCompra: {valor_compra}")
-                print(f"dataVenda: {data_venda_str}")
-                print(f"docVenda: {self.docVenda.text()}")
-                print(f"valorVenda: {valor_venda}")
-                print(f"imposto: {imposto}")
-                print(f"valorBase: {valorBase}")
-                print(f"taxa: {taxa}")
-                print(f"regime_fiscal: {regime_fiscal}")
-                print("--- Fim dos Argumentos ---")
-
-                success = add_expense_to_db(
-                    self.matricula.text(), self.marca.text(), isv,
-                    nRegistoContabilidade,
-                    data_compra_str, self.docCompra.text(),
-                    self.tipoDocumento.currentText(), valor_compra, data_venda_str,
-                    self.docVenda.text(), valor_venda, imposto, valorBase, taxa,
-                    regime_fiscal
-                )
-
-            if success:
-                self.close()
-                self.parent_window.load_table_data()
-                QMessageBox.information(self, "Sucesso", "Registo guardado com sucesso!")
-            else:
-                QMessageBox.critical(self, "Erro", "Erro ao guardar registo")
-
-        except Exception as e:
-            QMessageBox.critical(self, "Erro", f"Ocorreu um erro: {e}")
-            import traceback
-            traceback.print_exc()
-
-    def closeEvent(self, event):
-        if self.parent_window is not None:
-            self.parent_window.setGraphicsEffect(None)
-        event.accept()
-
-
-class ExpenseApp(QWidget):
-    def __init__(self):
-        super().__init__()
-        self.init_ui()
-        self.load_table_data()
-
-    def init_ui(self):
-        self.setWindowTitle("MBAuto")
-        self.setWindowState(Qt.WindowState.WindowMaximized)
-
-        self.add_button = QPushButton("Add Expense")
-        self.delete_button = QPushButton("Delete Expense")
-
-        # Mantemos as 7 colunas visíveis na tabela principal
-        self.table = QTableWidget(0, 7)
-        self.table.setHorizontalHeaderLabels(
-            ["ID", "Matrícula", "Marca", "Valor de Compra", "Documento de Venda", "Valor de Venda", "Imposto"]
-        )
-        self.table.setColumnHidden(0, True)  # Oculta a coluna ID
-        self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
-        self.table.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
-        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
-        self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
-        self.table.cellDoubleClicked.connect(self.open_edit_expense_dialog)
-
-        self.add_button.clicked.connect(self.show_add_expense_dialog)
-        self.delete_button.clicked.connect(self.delete_expense)
-
-        self.setup_layout()
-
-        self.apply_styles()
-
-    def show_add_expense_dialog(self):
-        self.add_expense_dialog = AddExpenseDialog(self)
-        opacity_effect = QGraphicsOpacityEffect()
-        opacity_effect.setOpacity(0.5)
-        self.setGraphicsEffect(opacity_effect)
-        self.add_expense_dialog.exec()
-
-    def open_edit_expense_dialog(self, row, column):
-        vehicle_id = int(self.table.item(row, 0).text())
-        initial_data = fetch_vehicle_by_id(vehicle_id)
-
-        if initial_data:
-            dialog = AddExpenseDialog(self, mode="edit", initial_data=initial_data)
-            opacity_effect = QGraphicsOpacityEffect()
-            opacity_effect.setOpacity(0.5)
-            self.setGraphicsEffect(opacity_effect)
-            dialog.exec()
-        else:
-            QMessageBox.critical(self, "Erro", "Não foi possível carregar os dados do veículo.")
-
-    def setup_layout(self):
-        layout = QVBoxLayout()
-        row1 = QHBoxLayout()
-
-        row1.addWidget(self.add_button)
-        row1.addWidget(self.delete_button)
-
-        layout.addLayout(row1)
-        layout.addWidget(self.table)
-
-        self.setLayout(layout)
-
-    def apply_styles(self):
-        self.setStyleSheet("""
-    /* Base styling */
-    QWidget {
-        background-color: #e3e9f2;
-        font-family: Arial, sans-serif;
-        font-size: 14px;
-        color: #333;
-    }
-
-    /* Headings for labels */
-    QLabel {
-        font-size: 16px;
-        color: #2c3e50;
-        font-weight: bold;
-        padding: 5px;
-    }
-
-    /* Styling for input fields */
-    QLineEdit, QComboBox, QDateEdit {
-        background-color: #ffffff;
-        font-size: 14px;
-        color: #333;
-        border: 1px solid #b0bfc6;
-        border-radius: 5px;
-        padding: 5px;
-    }
-    QLineEdit:hover, QComboBox:hover, QDateEdit:hover {
-        border: 1px solid #4caf50; /* Borda verde no hover */
-    }
-    QLineEdit:focus, QComboBox:focus, QDateEdit:focus {
-        border: 1px solid #2a9d8f; /* Borda verde mais escura no focus */
-        background-color: #f5f9fc;
-    }
-
-    /* Table styling */
-    QTableWidget {
-        background-color: #ffffff;
-        alternate-background-color: #f2f7fb;
-        gridline-color: #c0c9d0;
-        font-size: 14px;
-        border: 1px solid #cfd9e1;
-    }
-    QTableWidget::item:selected {
-        background-color: #d0d7de;
-        color: #000000;
-    }
-
-    QHeaderView::section {
-        background-color: #4caf50;
-        color: white;
-        font-weight: bold;
-        padding: 4px;
-        border: 1px solid #cfd9e1;
-    }
-
-    /* Scroll bar styling */
-    QScrollBar:vertical {
-        width: 12px;
-        background-color: #f0f0f0;
-        border: none;
-    }
-    QScrollBar::handle:vertical {
-        background-color: #4caf50;
-        min-height: 20px;
-        border-radius: 5px;
-    }
-    QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
-        background: none;
-    }
-
-    /* Buttons */
-    QPushButton {
-        background-color: #4caf50;
-        color: white;
-        padding: 10px 15px;
-        border-radius: 5px;
-        font-size: 14px;
-        font-weight: bold;
-        transition: background-color 0.3s;
-    }
-    QPushButton:hover {
-        background-color: #45a049;
-    }
-    QPushButton:pressed {
-        background-color: #3d8b40;
-    }
-    QPushButton:disabled {
-        background-color: #c8c8c8;
-        color: #6e6e6e;
-    }
-
-    /* Tooltip styling */
-    QToolTip {
-        background-color: #2c3e50;
-        color: #ffffff;
-        border: 1px solid #333;
-        font-size: 12px;
-        padding: 5px;
-        border-radius: 4px;
-    }
-
-    /* ESTILO PARA QRadioButton */
-    QRadioButton {
-        color: #333; /* Cor do texto mais escura para melhor legibilidade */
-        padding: 4px 0px; /* Mantém o padding */
-    }
-
-    QRadioButton::indicator {
-        width: 16px;
-        height: 16px;
-        border-radius: 8px; /* Mantém o indicador redondo */
-        border: 2px solid #555555; /* Borda mais escura para o indicador (normal) */
-        background-color: #ffffff; /* Fundo branco para o indicador (normal) */
-    }
-
-    QRadioButton::indicator:hover {
-        border: 2px solid #4caf50; /* Borda verde mais escura no hover */
-    }
-
-    QRadioButton::indicator:checked {
-        background-color: #4caf50; /* Preenchimento verde quando selecionado */
-        border: 2px solid #2a9d8f; /* Borda verde mais escura quando selecionado */
-    }
-""")
-
-    def add_record(self):
-        try:
-            # Função auxiliar para lidar com a conversão e arredondamento
-            def get_float_value(lineEdit_text):
-                # Remove espaços em branco e substitui vírgulas por pontos
-                text = lineEdit_text.replace(",", ".").strip()
-                if text:
-                    try:
-                        return round(float(text), 2)
-                    except ValueError:
-                        # Se a conversão falhar (ex: texto não numérico), retorna None
-                        return None
-                return None  # Retorna None se o campo estiver vazio
-
-            isv = get_float_value(self.isv.text())
-            # nRegistoContabilidade é mantido como string
-            nRegistoContabilidade = self.nRegistoContabilidade.text()
-            valor_compra = get_float_value(self.valorCompra.text())
-            valor_venda = get_float_value(self.valorVenda.text())
-            imposto = get_float_value(self.imposto.text())
-            valorBase = get_float_value(self.valorBase.text())
-            taxa = get_float_value(self.taxa.text())
+            valor_compra = self.get_float_value(self.valorCompra.text())
+            valor_venda = self.get_float_value(self.valorVenda.text())
+            imposto = self.get_float_value(self.imposto.text())
+            valorBase = self.get_float_value(self.valorBase.text())
+            taxa = self.get_float_value(self.taxa.text())
 
             data_compra_str = self.dataCompra.date().toString("yyyy-MM-dd")
             data_venda_str = self.dataVenda.date().toString("yyyy-MM-dd")
