@@ -25,8 +25,8 @@ def init_db(db_name):
             dataVenda TEXT,
             docVenda TEXT,
             valorVenda REAL,
-            imposto TEXT,
-            taxa TEXT,
+            imposto REAL,
+            taxa REAL,
             regime_fiscal TEXT
  )
     """)

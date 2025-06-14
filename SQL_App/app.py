@@ -59,8 +59,8 @@ class AddExpenseDialog(QDialog):
         self.docVenda.setText(self.initial_data.get("docVenda", ""))
         self.valorVenda.setText(str(self.initial_data.get("valorVenda", "")) if self.initial_data.get("valorVenda") is not None else "")
 
-        self.imposto.setText(self.initial_data.get("imposto", ""))
-        self.taxa.setText(self.initial_data.get("taxa", ""))
+        self.imposto.setText(str(self.initial_data.get("imposto", "")) if self.initial_data.get("imposto") is not None else "")
+        self.taxa.setText(str(self.initial_data.get("taxa", "")) if self.initial_data.get("taxa") is not None else "")
 
         regime_salvo = self.initial_data.get("regime_fiscal", "")
         if regime_salvo == "Regime Normal":  # <-- Possível problema aqui
@@ -178,6 +178,9 @@ class AddExpenseDialog(QDialog):
             elif self.regime_lucro_tributavel_radio.isChecked():
                 regime_fiscal = "Margem"
 
+            imposto = float(self.imposto.text().replace(",", ".")) if self.imposto.text() else None
+            taxa = float(self.taxa.text().replace(",", ".")) if self.taxa.text() else None
+
             if self.mode == "edit":
                 success = update_expense_in_db(self.initial_data["id"], {
                     "matricula": self.matricula.text(),
@@ -191,8 +194,8 @@ class AddExpenseDialog(QDialog):
                     "dataVenda": data_venda_str,
                     "docVenda": self.docVenda.text(),
                     "valorVenda": valor_venda,
-                    "imposto": self.imposto.text(),
-                    "taxa": self.taxa.text(),
+                    "imposto": imposto,
+                    "taxa": taxa,
                     "regime_fiscal": regime_fiscal # Já estava correto aqui
                 })
             else:
@@ -208,8 +211,8 @@ class AddExpenseDialog(QDialog):
                 print(f"dataVenda: {data_venda_str}")
                 print(f"docVenda: {self.docVenda.text()}")
                 print(f"valorVenda: {valor_venda}")
-                print(f"imposto: {self.imposto.text()}")
-                print(f"taxa: {self.taxa.text()}")
+                print(f"imposto: {imposto}")
+                print(f"taxa: {taxa}")
                 print(f"regime_fiscal: {regime_fiscal}")
                 print("--- Fim dos Argumentos ---")
 
