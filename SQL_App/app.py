@@ -29,10 +29,10 @@ class AddExpenseDialog(QDialog):
         self.valorCompra.textChanged.connect(self.calculate_regime_fields)
         self.valorVenda.textChanged.connect(self.update_regime_button_states)
         self.valorVenda.textChanged.connect(self.calculate_regime_fields)
-        # Alterado: 'imposto' para 'taxa'
-        self.taxa.textChanged.connect(self.update_regime_button_states)
-        self.taxa.textChanged.connect(self.calculate_regime_fields)
 
+        # Conectar o sinal currentIndexChanged do QComboBox da taxa
+        self.taxa.currentIndexChanged.connect(self.update_regime_button_states)
+        self.taxa.currentIndexChanged.connect(self.calculate_regime_fields)
 
         # Conectar o sinal clicked dos radio buttons (para capturar a seleção real e disparar cálculo)
         self.regime_geral_radio.clicked.connect(self.handle_regime_selection)
@@ -59,7 +59,7 @@ class AddExpenseDialog(QDialog):
         # Usar .get() com um valor padrão para evitar KeyError e TypeError se o valor for None
         self.matricula.setText(self.initial_data.get("matricula", ""))
         self.marca.setText(self.initial_data.get("marca", ""))
-        self.numeroQuadro.setText(self.initial_data.get("numeroQuadro", "")) # NOVO CAMPO: POPULAR
+        self.numeroQuadro.setText(self.initial_data.get("numeroQuadro", ""))
 
         # --- FUNÇÃO AUXILIAR PARA FORMATAR NÚMEROS REAIS (Vazio para None/Vazio) ---
         # NOVO: Esta função agora usa QLocale para formatação localizada (pontos de milhar, vírgula decimal)
@@ -74,6 +74,7 @@ class AddExpenseDialog(QDialog):
                     return locale.toString(numeric_value, 'f', 2)
             except (ValueError, TypeError):
                 return ""
+
         # --- FIM DA FUNÇÃO AUXILIAR ---
 
         self.isv.setText(format_real_for_display(self.initial_data.get("isv")))
@@ -106,13 +107,36 @@ class AddExpenseDialog(QDialog):
         else:
             self.dataVenda.setDate(QDate.currentDate())  # Define uma data padrão se não houver data
 
-        self.docVenda.setText(format_real_for_display(self.initial_data.get("docVenda")))  # Correção: docVenda é texto
+        self.docVenda.setText(self.initial_data.get("docVenda", ""))
         self.valorVenda.setText(format_real_for_display(self.initial_data.get("valorVenda")))
 
-        # Aplicar a função de formatação para imposto, valorBase e taxa
+        # Aplicar a função de formatação para imposto, valorBase
         self.imposto.setText(format_real_for_display(self.initial_data.get("imposto")))
         self.valorBase.setText(format_real_for_display(self.initial_data.get("valorBase")))
-        self.taxa.setText(format_real_for_display(self.initial_data.get("taxa"))) # Taxa agora é um input, não um output
+
+        # Popula o QComboBox da taxa
+        taxa_value = self.initial_data.get("taxa")
+        # Correção: Se taxa_value for None ou vazio, define para "N/A"
+        if taxa_value is None or (isinstance(taxa_value, str) and not taxa_value.strip()):
+            self.taxa.setCurrentText("N/A")
+        else:
+            # Converte para string para encontrar o item na combobox (ex: 6.0 -> "6")
+            # Usa str(int(taxa_value)) apenas se for um número inteiro, para evitar ".0"
+            try:
+                numeric_taxa = float(taxa_value)
+                if numeric_taxa.is_integer():
+                    taxa_str = str(int(numeric_taxa))
+                else:
+                    taxa_str = str(
+                        numeric_taxa)  # Para o caso de ter casas decimais (embora não esperado para 6, 13, 23)
+            except (ValueError, TypeError):
+                taxa_str = ""  # Em caso de erro na conversão, trata como vazio
+
+            index = self.taxa.findText(taxa_str)
+            if index >= 0:
+                self.taxa.setCurrentIndex(index)
+            else:
+                self.taxa.setCurrentText("N/A")  # Fallback se o valor não estiver na lista ou for inválido
 
         # Carregar o regime fiscal salvo, desabilitando sinais para não disparar handle_regime_selection
         self.regime_geral_radio.blockSignals(True)
@@ -137,7 +161,7 @@ class AddExpenseDialog(QDialog):
         # Campos
         self.matricula = QLineEdit()
         self.marca = QLineEdit()
-        self.numeroQuadro = QLineEdit() # NOVO CAMPO: LINHA DE EDIÇÃO
+        self.numeroQuadro = QLineEdit()
         self.isv = QLineEdit()
         self.nRegistoContabilidade = QLineEdit()
 
@@ -153,15 +177,18 @@ class AddExpenseDialog(QDialog):
         self.docVenda = QLineEdit()
         self.valorVenda = QLineEdit()
 
-        self.taxa = QLineEdit() # Taxa agora é um input
-        self.valorBase = QLineEdit()
-        self.imposto = QLineEdit() # Imposto agora é um output
+        # Taxa agora é um QComboBox
+        self.taxa = QComboBox()
+        self.taxa.addItems(["N/A", "6", "13", "23"])  # Valores da dropdown
 
-        # NOVOS CAMPOS: Checkboxes para o Regime Fiscal
+        self.valorBase = QLineEdit()
+        self.imposto = QLineEdit()  # Imposto agora é um output
+
+        # NOVOS CAMPOS: Radio Buttons para o Regime Fiscal
         self.regime_geral_radio = QRadioButton("Regime Normal")
         self.regime_lucro_tributavel_radio = QRadioButton("Margem")
 
-        # Layout para as checkboxes
+        # Layout para os radio buttons
         regime_layout = QHBoxLayout()
         regime_layout.addWidget(self.regime_geral_radio)
         regime_layout.addWidget(self.regime_lucro_tributavel_radio)
@@ -170,7 +197,7 @@ class AddExpenseDialog(QDialog):
         imposto_group = QGroupBox("Imposto")
         imposto_layout = QFormLayout()
         imposto_layout.addRow("Regime Fiscal:", regime_layout)
-        imposto_layout.addRow("Taxa:", self.taxa)
+        imposto_layout.addRow("Taxa:", self.taxa)  # Taxa agora é um QComboBox
         imposto_layout.addRow("Valor Base:", self.valorBase)
         imposto_layout.addRow("Imposto:", self.imposto)
         imposto_group.setLayout(imposto_layout)
@@ -180,7 +207,7 @@ class AddExpenseDialog(QDialog):
         identificacao_layout = QFormLayout()
         identificacao_layout.addRow("Matrícula:", self.matricula)
         identificacao_layout.addRow("Marca:", self.marca)
-        identificacao_layout.addRow("Número de Quadro:", self.numeroQuadro) # ADICIONAR NOVO CAMPO AO LAYOUT
+        identificacao_layout.addRow("Número de Quadro:", self.numeroQuadro)
         identificacao_layout.addRow("ISV:", self.isv)
         identificacao_layout.addRow("Nº Registo Contabilidade:", self.nRegistoContabilidade)
         identificacao_group.setLayout(identificacao_layout)
@@ -352,12 +379,17 @@ class AddExpenseDialog(QDialog):
     }
 """)
 
-    # Função auxiliar para lidar com a conversão e arredondamento (reutilizada)
-    def get_float_value(self, lineEdit_text):
-        if not lineEdit_text:
-            return None
+    # Função auxiliar para lidar com a conversão e arredondamento
+    def get_float_value(self, input_widget):
+        if isinstance(input_widget, QLineEdit):
+            text = input_widget.text()
+        elif isinstance(input_widget, QComboBox):
+            text = input_widget.currentText()
+            if text == "N/A" or not text.strip():  # Considerar "N/A" ou string vazia como None
+                return None
+        else:
+            return None  # Tipo de widget não suportado
 
-        text = str(lineEdit_text)
         # Primeiro remover todos os tipos de espaço
         text = text.replace("\u202f", "").replace(" ", "").replace("\xa0", "").strip()
         # Agora substituir a vírgula decimal por ponto
@@ -372,18 +404,17 @@ class AddExpenseDialog(QDialog):
     # Validação para o Regime Normal (Valor de Venda e Taxa)
     def are_normal_regime_fields_valid(self):
         """Verifica se os campos necessários para 'Regime Normal' estão preenchidos."""
-        # Alterado: 'imposto' para 'taxa'
-        return (self.get_float_value(self.valorVenda.text()) is not None and
-                self.get_float_value(self.taxa.text()) is not None)
+        # Agora verifica o valor do QComboBox da taxa
+        return (self.get_float_value(self.valorVenda) is not None and
+                self.get_float_value(self.taxa) is not None)
 
     # Validação para o Regime de Margem (Valor de Compra, Valor de Venda e Taxa)
     def are_margin_regime_fields_valid(self):
         """Verifica se os campos necessários para 'Margem' estão preenchidos."""
-        # Alterado: 'imposto' para 'taxa'
-        return (self.get_float_value(self.valorCompra.text()) is not None and
-                self.get_float_value(self.valorVenda.text()) is not None and
-                self.get_float_value(self.taxa.text()) is not None)
-
+        # Agora verifica o valor do QComboBox da taxa
+        return (self.get_float_value(self.valorCompra) is not None and
+                self.get_float_value(self.valorVenda) is not None and
+                self.get_float_value(self.taxa) is not None)
 
     def calculate_regime_fields(self):
         """
@@ -392,7 +423,7 @@ class AddExpenseDialog(QDialog):
         """
         # Desabilitamos sinais dos QLineEdit temporariamente para não disparar recursão
         self.valorBase.blockSignals(True)
-        self.imposto.blockSignals(True) # Alterado: 'taxa' para 'imposto'
+        self.imposto.blockSignals(True)
 
         # Usar QLocale para formatar os resultados
         locale = QLocale(QLocale.Language.Portuguese, QLocale.Country.Portugal)
@@ -400,71 +431,68 @@ class AddExpenseDialog(QDialog):
         try:
             if self.regime_geral_radio.isChecked() and self.are_normal_regime_fields_valid():
                 # Lógica de cálculo para Regime Normal
-                valor_venda = self.get_float_value(self.valorVenda.text())
-                taxa_percent = self.get_float_value(self.taxa.text()) # Alterado: 'imposto_percent' para 'taxa_percent'
+                valor_venda = self.get_float_value(self.valorVenda)
+                taxa_percent = self.get_float_value(self.taxa)  # Obter valor do QComboBox
 
                 if valor_venda is not None and taxa_percent is not None:
-                    # Cálculo para Regime Normal
                     divisor = (1 + taxa_percent / 100)
                     if divisor != 0:
                         valor_base_calculado = valor_venda / divisor
-                        imposto_calculado = valor_base_calculado * (taxa_percent / 100) # Alterado: 'taxa_calculada' para 'imposto_calculado'
+                        imposto_calculado = valor_base_calculado * (taxa_percent / 100)
 
                         self.valorBase.setText(locale.toString(valor_base_calculado, 'f', 2))
-                        self.imposto.setText(locale.toString(imposto_calculado, 'f', 2)) # Alterado: 'taxa' para 'imposto'
+                        self.imposto.setText(locale.toString(imposto_calculado, 'f', 2))
 
                         print(f"[DEBUG] Valor calculado - valorBase: {valor_base_calculado}")
-                        print(f"[DEBUG] Valor calculado - imposto: {imposto_calculado}") # Alterado: 'taxa' para 'imposto'
+                        print(f"[DEBUG] Valor calculado - imposto: {imposto_calculado}")
                         print(f"[DEBUG] Texto aplicado - valorBase: {self.valorBase.text()}")
-                        print(f"[DEBUG] Texto aplicado - imposto: {self.imposto.text()}") # Alterado: 'taxa' para 'imposto'
+                        print(f"[DEBUG] Texto aplicado - imposto: {self.imposto.text()}")
                     else:
                         self.valorBase.setText("Divisão por Zero")
-                        self.imposto.setText("Erro") # Alterado: 'taxa' para 'imposto'
+                        self.imposto.setText("Erro")
                 else:
                     self.valorBase.clear()
-                    self.imposto.clear() # Alterado: 'taxa' para 'imposto'
+                    self.imposto.clear()
 
             elif self.regime_lucro_tributavel_radio.isChecked() and self.are_margin_regime_fields_valid():
                 # Lógica de cálculo para Regime de Margem
-                valor_venda = self.get_float_value(self.valorVenda.text())
-                valor_compra = self.get_float_value(self.valorCompra.text())
-                taxa_percent = self.get_float_value(self.taxa.text()) # Alterado: 'imposto_percent' para 'taxa_percent'
+                valor_venda = self.get_float_value(self.valorVenda)
+                valor_compra = self.get_float_value(self.valorCompra)
+                taxa_percent = self.get_float_value(self.taxa)  # Obter valor do QComboBox
 
                 if valor_venda is not None and valor_compra is not None and taxa_percent is not None:
-                    # Cálculo para Regime de Margem
+                    margem_bruta = valor_venda - valor_compra
                     divisor = (1 + taxa_percent / 100)
                     if divisor != 0:
-                        margem_bruta = valor_venda - valor_compra
                         valor_base_calculado = margem_bruta / divisor
-                        imposto_calculado = valor_base_calculado * (taxa_percent / 100) # Alterado: 'taxa_calculada' para 'imposto_calculado'
+                        imposto_calculado = valor_base_calculado * (taxa_percent / 100)
 
                         self.valorBase.setText(locale.toString(valor_base_calculado, 'f', 2))
-                        self.imposto.setText(locale.toString(imposto_calculado, 'f', 2)) # Alterado: 'taxa' para 'imposto'
+                        self.imposto.setText(locale.toString(imposto_calculado, 'f', 2))
 
                         print(f"[DEBUG] Valor calculado - valorBase: {valor_base_calculado}")
-                        print(f"[DEBUG] Valor calculado - imposto: {imposto_calculado}") # Alterado: 'taxa' para 'imposto'
+                        print(f"[DEBUG] Valor calculado - imposto: {imposto_calculado}")
                         print(f"[DEBUG] Texto aplicado - valorBase: {self.valorBase.text()}")
-                        print(f"[DEBUG] Texto aplicado - imposto: {self.imposto.text()}") # Alterado: 'taxa' para 'imposto'
+                        print(f"[DEBUG] Texto aplicado - imposto: {self.imposto.text()}")
                     else:
                         self.valorBase.setText("Divisão por Zero")
-                        self.imposto.setText("Erro") # Alterado: 'taxa' para 'imposto'
+                        self.imposto.setText("Erro")
                 else:
                     self.valorBase.clear()
-                    self.imposto.clear() # Alterado: 'taxa' para 'imposto'
+                    self.imposto.clear()
             else:
                 # Se nenhum regime válido estiver selecionado ou os campos não forem válidos, limpar
                 self.valorBase.clear()
-                self.imposto.clear() # Alterado: 'taxa' para 'imposto'
+                self.imposto.clear()
 
         except Exception as e:
             print(f"Erro no cálculo de campos: {e}")
             self.valorBase.clear()
-            self.imposto.clear() # Alterado: 'taxa' para 'imposto'
+            self.imposto.clear()
 
         # Reabilitar sinais dos QLineEdit
         self.valorBase.blockSignals(False)
-        self.imposto.blockSignals(False) # Alterado: 'taxa' para 'imposto'
-
+        self.imposto.blockSignals(False)
 
     def update_regime_button_states(self):
         """Habilita/desabilita os radio buttons com base na validação dos campos."""
@@ -500,8 +528,7 @@ class AddExpenseDialog(QDialog):
             # garante que nenhum radio está marcado e que o cálculo é limpo.
             if not self.regime_geral_radio.isChecked() and not self.regime_lucro_tributavel_radio.isChecked():
                 self.valorBase.clear()
-                self.imposto.clear() # Alterado: 'taxa' para 'imposto'
-
+                self.imposto.clear()
 
         self.regime_geral_radio.blockSignals(False)
         self.regime_lucro_tributavel_radio.blockSignals(False)
@@ -509,7 +536,6 @@ class AddExpenseDialog(QDialog):
         # Após atualizar os estados dos botões (e possivelmente desmarcar um radio),
         # Dispara o cálculo novamente para garantir que os campos de imposto são atualizados.
         self.calculate_regime_fields()
-
 
     def handle_regime_selection(self):
         """
@@ -541,10 +567,6 @@ class AddExpenseDialog(QDialog):
             missing_fields.append("Matrícula")
         if not self.marca.text().strip():
             missing_fields.append("Marca")
-        # Removido: A validação do numeroQuadro já não é obrigatória
-        # if not self.numeroQuadro.text().strip():
-        #    missing_fields.append("Número de Quadro")
-        # Adicione mais validações de campos gerais aqui se necessário
 
         if missing_fields:
             QMessageBox.warning(self, "Campos Obrigatórios em Falta",
@@ -560,15 +582,17 @@ class AddExpenseDialog(QDialog):
             current_regime_selected = "Margem"
 
         if current_regime_selected == "Regime Normal":
+            # Aqui, taxa é um QComboBox, então passamos o widget diretamente
             if not self.are_normal_regime_fields_valid():
                 QMessageBox.warning(self, "Campos em Falta para Regime Normal",
-                                    "Por favor, preencha 'Valor de Venda' e 'Taxa' para o Regime Normal.") # Alterado: 'Imposto' para 'Taxa'
+                                    "Por favor, preencha 'Valor de Venda' e selecione uma 'Taxa' para o Regime Normal.")
                 return False
 
         elif current_regime_selected == "Margem":
+            # Aqui, taxa é um QComboBox, então passamos o widget diretamente
             if not self.are_margin_regime_fields_valid():
                 QMessageBox.warning(self, "Campos em Falta para Regime Margem",
-                                    "Por favor, preencha 'Valor de Compra', 'Valor de Venda' e 'Taxa' para o Regime Margem.") # Alterado: 'Imposto' para 'Taxa'
+                                    "Por favor, preencha 'Valor de Compra', 'Valor de Venda' e selecione uma 'Taxa' para o Regime Margem.")
                 return False
 
         return True
@@ -580,19 +604,21 @@ class AddExpenseDialog(QDialog):
             return  # Se a validação falhar, não prossegue com a gravação
 
         try:
-            isv = self.get_float_value(self.isv.text())
+            isv = self.get_float_value(self.isv)  # Ajustado para passar o widget
             nRegistoContabilidade = self.nRegistoContabilidade.text()
-            # NOVO CAMPO: OBTER VALOR
             numero_quadro = self.numeroQuadro.text()
 
-            valor_compra = self.get_float_value(self.valorCompra.text())
-            valor_venda = self.get_float_value(self.valorVenda.text())
-            taxa = self.get_float_value(self.taxa.text()) # Taxa agora é lida como input
-            # Certifique-se de que valorBase e imposto são lidos dos campos, não recalculados aqui
-            valorBase_from_field = self.get_float_value(self.valorBase.text())
-            imposto_from_field = self.get_float_value(self.imposto.text()) # Imposto agora é o output
-            print(f"[DEBUG] valorBase_from_field: {valorBase_from_field}")
-            print(f"[DEBUG] imposto_from_field: {imposto_from_field}") # Alterado: 'taxa' para 'imposto'
+            valor_compra = self.get_float_value(self.valorCompra)  # Ajustado para passar o widget
+            valor_venda = self.get_float_value(self.valorVenda)  # Ajustado para passar o widget
+            taxa = self.get_float_value(self.taxa)  # Obter valor do QComboBox usando get_float_value
+
+            valorBase_from_field = self.get_float_value(self.valorBase)  # Ajustado para passar o widget
+            imposto_from_field = self.get_float_value(self.imposto)  # Ajustado para passar o widget
+
+            print(f"[DEBUG] valorBase_from_field (antes do DB): {valorBase_from_field}")
+            print(f"[DEBUG] imposto_from_field (antes do DB): {imposto_from_field}")
+            print(f"[DEBUG] taxa (antes do DB): {taxa}")
+
             data_compra_str = self.dataCompra.date().toString("yyyy-MM-dd")
             data_venda_str = self.dataVenda.date().toString("yyyy-MM-dd")
 
@@ -606,7 +632,7 @@ class AddExpenseDialog(QDialog):
                 success = update_expense_in_db(self.initial_data["id"], {
                     "matricula": self.matricula.text(),
                     "marca": self.marca.text(),
-                    "numeroQuadro": numero_quadro, # NOVO CAMPO NO DICIONÁRIO
+                    "numeroQuadro": numero_quadro,
                     "isv": isv,
                     "nRegistoContabilidade": nRegistoContabilidade,
                     "dataCompra": data_compra_str,
@@ -616,16 +642,16 @@ class AddExpenseDialog(QDialog):
                     "dataVenda": data_venda_str,
                     "docVenda": self.docVenda.text(),
                     "valorVenda": valor_venda,
-                    "imposto": imposto_from_field, # Usar o valor do campo que agora é o resultado do imposto
+                    "imposto": imposto_from_field,
                     "valorBase": valorBase_from_field,
-                    "taxa": taxa, # Taxa é o input
+                    "taxa": taxa,
                     "regime_fiscal": regime_fiscal
                 })
             else:
                 print("\n--- Argumentos passados para add_expense_to_db ---")
                 print(f"matricula: {self.matricula.text()}")
                 print(f"marca: {self.marca.text()}")
-                print(f"numeroQuadro: {numero_quadro}") # NOVO CAMPO NO PRINT
+                print(f"numeroQuadro: {numero_quadro}")
                 print(f"isv: {isv}")
                 print(f"nRegistoContabilidade: {nRegistoContabilidade}")
                 print(f"dataCompra: {data_compra_str}")
@@ -635,18 +661,18 @@ class AddExpenseDialog(QDialog):
                 print(f"dataVenda: {data_venda_str}")
                 print(f"docVenda: {self.docVenda.text()}")
                 print(f"valorVenda: {valor_venda}")
-                print(f"imposto: {imposto_from_field}") # Passar o imposto como o output calculado
+                print(f"imposto: {imposto_from_field}")
                 print(f"valorBase: {valorBase_from_field}")
-                print(f"taxa: {taxa}") # Passar a taxa como input
+                print(f"taxa: {taxa}")
                 print(f"regime_fiscal: {regime_fiscal}")
                 print("--- Fim dos Argumentos ---")
 
                 success = add_expense_to_db(
-                    self.matricula.text(), self.marca.text(), numero_quadro, isv, # NOVO CAMPO NO CHAMADA
+                    self.matricula.text(), self.marca.text(), numero_quadro, isv,
                     nRegistoContabilidade,
                     data_compra_str, self.docCompra.text(),
                     self.tipoDocumento.currentText(), valor_compra, data_venda_str,
-                    self.docVenda.text(), valor_venda, imposto_from_field, valorBase_from_field, taxa, # Passar valores dos campos, com imposto e taxa invertidos
+                    self.docVenda.text(), valor_venda, imposto_from_field, valorBase_from_field, taxa,
                     regime_fiscal
                 )
 
@@ -685,7 +711,8 @@ class ExpenseApp(QWidget):
         # As colunas da tabela principal são: ID, Matrícula, Marca, Valor de Compra, Documento de Venda, Valor de Venda, Imposto
         self.table = QTableWidget(0, 7)
         self.table.setHorizontalHeaderLabels(
-            ["ID", "Matrícula", "Marca", "Valor de Compra", "Documento de Venda", "Valor de Venda", "Imposto"] # Esta label continua a ser 'Imposto' para o que é exibido
+            ["ID", "Matrícula", "Marca", "Valor de Compra", "Documento de Venda", "Valor de Venda", "Imposto"]
+            # Esta label continua a ser 'Imposto' para o que é exibido
         )
         self.table.setColumnHidden(0, True)  # Oculta a coluna ID
         self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
