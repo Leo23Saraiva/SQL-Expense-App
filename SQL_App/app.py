@@ -59,6 +59,7 @@ class AddExpenseDialog(QDialog):
         # Usar .get() com um valor padrão para evitar KeyError e TypeError se o valor for None
         self.matricula.setText(self.initial_data.get("matricula", ""))
         self.marca.setText(self.initial_data.get("marca", ""))
+        self.numeroQuadro.setText(self.initial_data.get("numeroQuadro", "")) # NOVO CAMPO: POPULAR
 
         # --- FUNÇÃO AUXILIAR PARA FORMATAR NÚMEROS REAIS (Vazio para None/Vazio) ---
         # NOVO: Esta função agora usa QLocale para formatação localizada (pontos de milhar, vírgula decimal)
@@ -136,6 +137,7 @@ class AddExpenseDialog(QDialog):
         # Campos
         self.matricula = QLineEdit()
         self.marca = QLineEdit()
+        self.numeroQuadro = QLineEdit() # NOVO CAMPO: LINHA DE EDIÇÃO
         self.isv = QLineEdit()
         self.nRegistoContabilidade = QLineEdit()
 
@@ -178,6 +180,7 @@ class AddExpenseDialog(QDialog):
         identificacao_layout = QFormLayout()
         identificacao_layout.addRow("Matrícula:", self.matricula)
         identificacao_layout.addRow("Marca:", self.marca)
+        identificacao_layout.addRow("Número de Quadro:", self.numeroQuadro) # ADICIONAR NOVO CAMPO AO LAYOUT
         identificacao_layout.addRow("ISV:", self.isv)
         identificacao_layout.addRow("Nº Registo Contabilidade:", self.nRegistoContabilidade)
         identificacao_group.setLayout(identificacao_layout)
@@ -538,6 +541,8 @@ class AddExpenseDialog(QDialog):
             missing_fields.append("Matrícula")
         if not self.marca.text().strip():
             missing_fields.append("Marca")
+        if not self.numeroQuadro.text().strip(): # NOVO CAMPO: VALIDAÇÃO
+            missing_fields.append("Número de Quadro")
         # Adicione mais validações de campos gerais aqui se necessário
 
         if missing_fields:
@@ -576,6 +581,9 @@ class AddExpenseDialog(QDialog):
         try:
             isv = self.get_float_value(self.isv.text())
             nRegistoContabilidade = self.nRegistoContabilidade.text()
+            # NOVO CAMPO: OBTER VALOR
+            numero_quadro = self.numeroQuadro.text()
+
             valor_compra = self.get_float_value(self.valorCompra.text())
             valor_venda = self.get_float_value(self.valorVenda.text())
             taxa = self.get_float_value(self.taxa.text()) # Taxa agora é lida como input
@@ -597,6 +605,7 @@ class AddExpenseDialog(QDialog):
                 success = update_expense_in_db(self.initial_data["id"], {
                     "matricula": self.matricula.text(),
                     "marca": self.marca.text(),
+                    "numeroQuadro": numero_quadro,
                     "isv": isv,
                     "nRegistoContabilidade": nRegistoContabilidade,
                     "dataCompra": data_compra_str,
@@ -615,6 +624,7 @@ class AddExpenseDialog(QDialog):
                 print("\n--- Argumentos passados para add_expense_to_db ---")
                 print(f"matricula: {self.matricula.text()}")
                 print(f"marca: {self.marca.text()}")
+                print(f"numeroQuadro: {numero_quadro}") # NOVO CAMPO NO PRINT
                 print(f"isv: {isv}")
                 print(f"nRegistoContabilidade: {nRegistoContabilidade}")
                 print(f"dataCompra: {data_compra_str}")
@@ -631,7 +641,7 @@ class AddExpenseDialog(QDialog):
                 print("--- Fim dos Argumentos ---")
 
                 success = add_expense_to_db(
-                    self.matricula.text(), self.marca.text(), isv,
+                    self.matricula.text(), self.marca.text(), numero_quadro, isv, # NOVO CAMPO NO CHAMADA
                     nRegistoContabilidade,
                     data_compra_str, self.docCompra.text(),
                     self.tipoDocumento.currentText(), valor_compra, data_venda_str,
