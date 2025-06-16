@@ -5,7 +5,7 @@ from PyQt6.QtWidgets import (
     QRadioButton, QCalendarWidget
 )
 from PyQt6.QtCore import QDate, Qt, QLocale, QEvent
-from PyQt6.QtGui import QValidator
+from PyQt6.QtGui import QValidator, QColor  # Importar QColor
 from decimal import Decimal
 
 from database import fetch_expenses, add_expense_to_db, delete_expense_from_db, update_expense_in_db, \
@@ -248,7 +248,7 @@ class DateLineEdit(QHBoxLayout):
             else:
                 # Se não for um QDate válido do formato esperado, apenas define o texto bruto
                 # e deixa o validador/formatador lidar com isso no textChanged
-                print(f"[DEBUG - DateLineEdit] setText: '{text}' not a valid yyyy-MM-dd. Setting raw text.")
+                print(f"[DEBUG - DateLineEdit] setText: '{text}' not a valid ISO date. Setting raw text.")
                 self.date_input.blockSignals(True)
                 self.date_input.setText(text)
                 self.date_input.blockSignals(False)
@@ -386,13 +386,8 @@ class AddExpenseDialog(QDialog):
         self.dataVenda.setText(data_venda_str)
         print(f"[DEBUG - AddExpenseDialog] After dataVenda.setText, field content: '{self.dataVenda.text()}'")
 
-        self.docVenda.setText(
-            format_real_for_display(self.initial_data.get("docVenda")))  # Este deve ser texto, não real.
+        self.docVenda.setText(self.initial_data.get("docVenda", ""))  # Este deve ser texto, não real.
         self.valorVenda.setText(format_real_for_display(self.initial_data.get("valorVenda")))
-
-        # Aplicar a função de formatação para imposto, valorBase
-        self.imposto.setText(format_real_for_display(self.initial_data.get("imposto")))
-        self.valorBase.setText(format_real_for_display(self.initial_data.get("valorBase")))
 
         # Popula o QComboBox da taxa
         taxa_value = self.initial_data.get("taxa")
@@ -573,10 +568,20 @@ class AddExpenseDialog(QDialog):
         font-size: 14px;
         border: 1px solid #cfd9e1;
     }
+
+    /* A COR DE SELEÇÃO DEVE SER MAIS ESPECÍFICA PARA SOBREPÔR OUTRAS CORES */
     QTableWidget::item:selected {
-        background-color: #d0d7de;
+        background-color: #d0d7de; /* Cor de seleção cinza mais clara */
         color: #000000;
     }
+
+    /* NOVO: Estilo para itens vendidos - será sobreposto por ::item:selected */
+    /* Este estilo aplica-se ao item individual, o que pode ser mais robusto */
+    QTableWidget::item[sold="true"] { /* Usamos uma propriedade dinâmica 'sold' */
+        background-color: #d4edda; /* Verde pastel para vendido */
+        color: #333; /* Cor do texto para contraste */
+    }
+
 
     QHeaderView::section {
         background-color: #4caf50;
@@ -673,492 +678,406 @@ class AddExpenseDialog(QDialog):
         border-radius: 5px;
     }
 
-    QCalendarWidget QWidget#qt_calendar_navigationbar { /* Barra de navegação */
-        background-color: #e8ecf4; 
-        color: white; /* Cor do texto para toda a barra */
+    /* Barra de navegação do calendário (onde está o mês e ano) */
+    QCalendarWidget QWidget#qt_calendar_navigationbar {
+        background-color: #e8ecf4; /* Cor de fundo que você definiu como ideal */
+        color: #333; /* Cor do texto para toda a barra - ajustado para o novo fundo */
         border-top-left-radius: 5px;
         border-top-right-radius: 5px;
-    }
-    /* Estilo dos botões de navegação e ano/mês */
-    QCalendarWidget QWidget#qt_calendar_navigationbar QPushButton {
-        background-color: #4caf50; /* Verde */
-        color: white;
-        border: 1px solid #3d8b40;
-        border-radius: 3px;
-        font-size: 16px;
-        padding: 5px;
-    }
-    QCalendarWidget QWidget#qt_calendar_navigationbar QPushButton:hover {
-        background-color: #45a049;
-    }
-    QCalendarWidget QWidget#qt_calendar_navigationbar QPushButton:pressed {
-        background-color: #3d8b40;
-    }
-    /* Spinbox de ano e mês no calendário */
-    QCalendarWidget QSpinBox {
-        border: 1px solid #b0bfc6;
-        border-radius: 3px;
-        padding-right: 15px; /* Espaço para o botão de seta */
-        color: white; /* Cor do texto do spinbox */
-        background-color: #4caf50; /* Fundo verde para o spinbox */
-    }
-    QCalendarWidget QSpinBox::up-button, QCalendarWidget QSpinBox::down-button {
-        width: 16px;
-        border: 1px solid #b0bfc6;
-        border-radius: 3px;
-        background-color: #f0f0f0;
-    }
-    QCalendarWidget QSpinBox::up-arrow, QCalendarWidget QSpinBox::down-arrow {
-        width: 10px;
-        height: 10px;
-    }
-    QCalendarWidget QSpinBox::up-button:hover, QCalendarWidget QSpinBox::down-button:hover {
-        background-color: #e0e0e0;
+        border: none; /* Remover qualquer borda residual */
     }
 
-    QCalendarWidget QAbstractItemView { /* Grid do calendário */
-        selection-background-color: #d0d7de; /* Cor de fundo da seleção ao passar o rato */
-        selection-color: #000000; /* Cor do texto da seleção ao passar o rato */
-        outline: none; /* Remover a borda de foco */
+    /* Estilo dos botões de navegação (setas) e spinbox de ano/mês */
+    QCalendarWidget QAbstractSpinBox,
+    QCalendarWidget QPushButton {
+        background-color: #e8ecf4; /* Mesma cor da barra de navegação */
+        color: #4caf50; /* Cor do texto verde */
+        border: 1px solid #b0bfc6; /* Borda cinza suave */
+        border-radius: 3px;
+        font-size: 14px; /* Ajuste para caber melhor */
+        padding: 3px 5px; /* Reduzir padding para os botões e spinbox */
     }
+    QCalendarWidget QAbstractSpinBox:hover,
+    QCalendarWidget QPushButton:hover {
+        background-color: #dbe2ea; /* Um tom ligeiramente mais escuro no hover */
+    }
+    QCalendarWidget QAbstractSpinBox:pressed,
+    QCalendarWidget QPushButton:pressed {
+        background-color: #c9d0d9; /* Um tom ainda mais escuro no pressed */
+    }
+
+    /* Setas dentro do Spinbox */
+    QCalendarWidget QSpinBox::up-button,
+    QCalendarWidget QSpinBox::down-button {
+        subcontrol-origin: border;
+        subcontrol-position: right;
+        width: 16px;
+        border-left: 1px solid #b0bfc6; /* Borda para separar o botão */
+        background-color: #e8ecf4; /* Mesma cor da barra */
+        border-top-right-radius: 3px;
+        border-bottom-right-radius: 3px;
+    }
+    QCalendarWidget QSpinBox::up-button:hover,
+    QCalendarWidget QSpinBox::down-button:hover {
+        background-color: #dbe2ea;
+    }
+    QCalendarWidget QSpinBox::up-arrow,
+    QCalendarWidget QSpinBox::down-arrow {
+        background-color: transparent;
+        color: #4caf50; /* A cor da seta será o verde */
+    }
+
+    /* Cabeçalho da grelha do calendário (Dias da Semana - Seg, Ter, Qua, etc.) */
+    QCalendarWidget QAbstractItemView {
+        background-color: #ffffff; /* Fundo branco para toda a área dos dias */
+        selection-background-color: #a0d4a3; /* Fundo mais claro para dias selecionados */
+        selection-color: #000000; /* Cor do texto para dias selecionados */
+        outline: none; /* Remover a borda de foco */
+        border-bottom: 1px solid #e0e0e0; /* Linha de separação para o cabeçalho dos dias da semana */
+    }
+
+    QCalendarWidget QAbstractItemView QHeaderView::section {
+        background-color: #f0f0f0; /* Fundo cinza claro para a linha dos dias da semana */
+        color: #555555; /* Cor do texto para os dias da semana */
+        border: none;
+        padding: 5px;
+    }
+
     /* Estilo para o dia normal no calendário */
     QCalendarWidget QAbstractItemView:enabled {
-        color: #333; /* Cor do texto padrão para dias */
+        color: #333; /* Cor do texto padrão para os números dos dias */
     }
 
     QCalendarWidget QAbstractItemView:enabled:hover {
-        background-color: #f2f7fb; /* Cor de fundo ao passar o mouse */
+        background-color: #e6ffe6; /* Um verde muito claro no hover */
+        border-radius: 3px; /* Bordas arredondadas no hover */
     }
 
     QCalendarWidget QAbstractItemView:selected {
         background-color: #2a9d8f; /* Cor do fundo do dia selecionado (verde mais escuro) */
         color: white; /* Cor do texto do dia selecionado */
+        border-radius: 3px; /* Bordas arredondadas para seleção */
     }
 
-    /* Para o dia de hoje - agora será um círculo cinza suave com borda verde */
+    /* Para o dia de hoje - AGORA COM CIRCULO VERDE MAIS CLARO */
     QCalendarWidget QAbstractItemView:!selected:focus { /* Dia de hoje, se não estiver selecionado */
-        background-color: #e0e0e0; /* Cinza suave para o dia de hoje */
+        background-color: #d4f7d4; /* Um verde pastel */
         color: #000000;
         border: 1px solid #4caf50; /* Borda verde suave */
         border-radius: 50%; /* Faz um círculo */
     }
+
     /* Para a borda à volta do número do dia */
     QCalendarWidget QCalendarView::item {
         border-radius: 0px; /* Reset para itens normais */
+        padding: 4px; /* Padding para espaçar os números */
+    }
+
+    /* Dias desabilitados (fora do mês atual) */
+    QCalendarWidget QAbstractItemView:disabled {
+        color: #cccccc; /* Cor cinza para dias fora do mês */
     }
 """)
 
-    # Função auxiliar para lidar com a conversão e arredondamento
-    def get_float_value(self, input_widget):
-        if isinstance(input_widget, QLineEdit):
-            text = input_widget.text()
-        elif isinstance(input_widget, QComboBox):
-            text = input_widget.currentText()
-            if text == "N/A" or not text.strip():  # Considerar "N/A" ou string vazia como None
+    def get_form_data(self):
+        # Esta função já estava completa e não precisa de alterações relacionadas a "vendido"
+        matricula = self.matricula.text().strip()
+        marca = self.marca.text().strip()
+        numero_quadro = self.numeroQuadro.text().strip()
+
+        # Funções para conversão segura de campos numéricos
+        def parse_float(text):
+            locale = QLocale(QLocale.Language.Portuguese, QLocale.Country.Portugal)
+            try:
+                # Remove espaços em branco
+                clean_text = text.strip()
+                if not clean_text:  # Se for string vazia após strip, retorna None
+                    return None
+                # Converte para float usando a localidade correta para vírgula/ponto decimal
+                return locale.toFloat(clean_text)[0]  # [0] para obter o float do tuple (float, bool)
+            except Exception as e:
+                print(f"Erro ao converter '{text}' para float: {e}")
                 return None
-        else:
-            return None  # Tipo de widget não suportado
 
-        # Primeiro remover todos os tipos de espaço
-        text = text.replace("\u202f", "").replace(" ", "").replace("\xa0", "").strip()
-        # Agora substituir a vírgula decimal por ponto
-        text = text.replace(",", ".")
+        def parse_int(text):
+            try:
+                # Remove espaços em branco
+                clean_text = text.strip()
+                if not clean_text:  # Se for string vazia após strip, retorna None
+                    return None
+                return int(clean_text)
+            except ValueError:
+                return None
 
-        try:
-            return round(float(text), 2)
-        except ValueError:
-            print(f"[DEBUG] Erro ao converter valor para float: {text}")
-            return None
+        isv = parse_float(self.isv.text())
+        n_registo_contabilidade = self.nRegistoContabilidade.text().strip()  # Manter como string
 
-    # Validação para o Regime Normal (Valor de Venda e Taxa)
-    def are_normal_regime_fields_valid(self):
-        """Verifica se os campos necessários para 'Regime Normal' estão preenchidos."""
-        # Agora verifica o valor do QComboBox da taxa
-        return (self.get_float_value(self.valorVenda) is not None and
-                self.get_float_value(self.taxa) is not None)
+        # Obter data da compra do DateLineEdit
+        data_compra_qdate = self.dataCompra.date()
+        data_compra = data_compra_qdate.toString("yyyy-MM-dd") if data_compra_qdate.isValid() else None
 
-    # Validação para o Regime de Margem (Valor de Compra, Valor de Venda e Taxa)
-    def are_margin_regime_fields_valid(self):
-        """Verifica se os campos necessários para 'Margem' estão preenchidos."""
-        # Agora verifica o valor do QComboBox da taxa
-        return (self.get_float_value(self.valorCompra) is not None and
-                self.get_float_value(self.valorVenda) is not None and
-                self.get_float_value(self.taxa) is not None)
+        doc_compra = self.docCompra.text().strip()
+        tipo_documento = self.tipoDocumento.currentText()
+        valor_compra = parse_float(self.valorCompra.text())
 
-    def calculate_regime_fields(self):
-        """
-        Calcula automaticamente os campos 'Valor Base' e 'Imposto' com base no regime fiscal selecionado
-        e nos valores de compra, venda e taxa.
-        """
-        # Desabilitamos sinais dos QLineEdit temporariamente para não disparar recursão
-        self.valorBase.blockSignals(True)
-        self.imposto.blockSignals(True)
+        # Obter data da venda do DateLineEdit
+        data_venda_qdate = self.dataVenda.date()
+        data_venda = data_venda_qdate.toString("yyyy-MM-dd") if data_venda_qdate.isValid() else None
 
-        # Usar QLocale para formatar os resultados
-        locale = QLocale(QLocale.Language.Portuguese, QLocale.Country.Portugal)
+        doc_venda = self.docVenda.text().strip()  # Manter como string
+        valor_venda = parse_float(self.valorVenda.text())
 
-        try:
-            if self.regime_geral_radio.isChecked() and self.are_normal_regime_fields_valid():
-                # Lógica de cálculo para Regime Normal
-                valor_venda = self.get_float_value(self.valorVenda)
-                taxa_percent = self.get_float_value(self.taxa)  # Obter valor do QComboBox
+        # Imposto é calculado, não lido diretamente
+        imposto = parse_float(self.imposto.text())
+        valor_base = parse_float(self.valorBase.text())
 
-                if valor_venda is not None and taxa_percent is not None:
-                    divisor = (1 + taxa_percent / 100)
-                    if divisor != 0:
-                        valor_base_calculado = valor_venda / divisor
-                        imposto_calculado = valor_base_calculado * (taxa_percent / 100)
+        taxa_str = self.taxa.currentText()
+        taxa = parse_float(taxa_str) if taxa_str != "N/A" else None
 
-                        self.valorBase.setText(locale.toString(valor_base_calculado, 'f', 2))
-                        self.imposto.setText(locale.toString(imposto_calculado, 'f', 2))
-
-                        print(f"[DEBUG] Valor calculado - valorBase (Regime Normal): {valor_base_calculado}")
-                        print(f"[DEBUG] Valor calculado - imposto (Regime Normal): {imposto_calculado}")
-                    else:
-                        self.valorBase.setText("Divisão por Zero")
-                        self.imposto.setText("Erro")
-                else:
-                    self.valorBase.clear()
-                    self.imposto.clear()
-
-            elif self.regime_lucro_tributavel_radio.isChecked() and self.are_margin_regime_fields_valid():
-                # Lógica de cálculo para Regime de Margem
-                valor_venda = self.get_float_value(self.valorVenda)
-                valor_compra = self.get_float_value(self.valorCompra)
-                taxa_percent = self.get_float_value(self.taxa)  # Obter valor do QComboBox
-
-                if valor_venda is not None and valor_compra is not None and taxa_percent is not None:
-                    margem_bruta = valor_venda - valor_compra
-                    divisor = (1 + taxa_percent / 100)
-                    if divisor != 0:
-                        valor_base_calculado = margem_bruta / divisor
-                        imposto_calculado = valor_base_calculado * (taxa_percent / 100)
-
-                        self.valorBase.setText(locale.toString(valor_base_calculado, 'f', 2))
-                        self.imposto.setText(locale.toString(imposto_calculado, 'f', 2))
-
-                        print(f"[DEBUG] Valor calculado - valorBase (Margem): {valor_base_calculado}")
-                        print(f"[DEBUG] Valor calculado - imposto (Margem): {imposto_calculado}")
-                    else:
-                        self.valorBase.setText("Divisão por Zero")
-                        self.imposto.setText("Erro")
-                else:
-                    self.valorBase.clear()
-                    self.imposto.clear()
-            else:
-                # Se nenhum regime válido estiver selecionado ou os campos não forem válidos, limpar
-                self.valorBase.clear()
-                self.imposto.clear()
-
-        except Exception as e:
-            print(f"Erro no cálculo de campos: {e}")
-            self.valorBase.clear()
-            self.imposto.clear()
-
-        # Reabilitar sinais dos QLineEdit
-        self.valorBase.blockSignals(False)
-        self.imposto.blockSignals(False)
-
-    def update_regime_button_states(self):
-        """Habilita/desabilita os radio buttons com base na validação dos campos."""
-
-        # Desabilitamos os sinais dos radio buttons para evitar loops ou seleção automática indesejada
-        self.regime_geral_radio.blockSignals(True)
-        self.regime_lucro_tributavel_radio.blockSignals(True)
-
-        can_select_normal = self.are_normal_regime_fields_valid()
-        can_select_margin = self.are_margin_regime_fields_valid()
-
-        self.regime_geral_radio.setEnabled(can_select_normal)
-        self.regime_lucro_tributavel_radio.setEnabled(can_select_margin)
-
-        # Se o regime atualmente selecionado (last_valid_regime_radio)
-        # se tornar inválido, desmarca-o.
-        if self.regime_geral_radio.isChecked() and not can_select_normal:
-            self.regime_geral_radio.setChecked(False)
-            self.last_valid_regime_radio = None
-
-        if self.regime_lucro_tributavel_radio.isChecked() and not can_select_margin:
-            self.regime_lucro_tributavel_radio.setChecked(False)
-            self.last_valid_regime_radio = None
-
-        # Re-marcar o último regime válido se ele ainda for válido
-        if self.last_valid_regime_radio == self.regime_geral_radio and can_select_normal:
-            self.regime_geral_radio.setChecked(True)
-        elif self.last_valid_regime_radio == self.regime_lucro_tributavel_radio and can_select_margin:
-            self.regime_lucro_tributavel_radio.setChecked(True)
-        else:
-            # Se o último regime válido não puder ser re-marcado (tornou-se inválido),
-            # ou se não havia last_valid_regime_radio e nenhum está marcado,
-            # garante que nenhum radio está marcado e que o cálculo é limpo.
-            if not self.regime_geral_radio.isChecked() and not self.regime_lucro_tributavel_radio.isChecked():
-                self.valorBase.clear()
-                self.imposto.clear()
-
-        self.regime_geral_radio.blockSignals(False)
-        self.regime_lucro_tributavel_radio.blockSignals(False)
-
-        # Após atualizar os estados dos botões (e possivelmente desmarcar um radio),
-        # Dispara o cálculo novamente para garantir que os campos de imposto são atualizados.
-        self.calculate_regime_fields()
-
-    def handle_regime_selection(self):
-        """
-        Lida com a seleção de um regime fiscal, atualizando last_valid_regime_radio.
-        A validação de campos obrigatórios é feita no update_regime_button_states
-        e na validação final antes de salvar.
-        """
-        sender_radio = self.sender()
-        if sender_radio.isChecked():
-            # Se um radio button foi clicado e está marcado, ele é o novo last_valid_regime_radio.
-            # A validade dos campos já foi verificada pelo update_regime_button_states que habilitou o botão.
-            self.last_valid_regime_radio = sender_radio
-            print(f"Regime selecionado: {sender_radio.text()}")
-        else:
-            # Se um radio button foi desmarcado (o que só acontece se o outro for marcado)
-            # e não temos um last_valid_regime_radio atual, então limpamos.
-            # Isso é mais uma salvaguarda, pois last_valid_regime_radio deve sempre apontar para o marcado.
-            if self.last_valid_regime_radio == sender_radio:
-                self.last_valid_regime_radio = None
-
-        # Dispara o cálculo assim que um regime é selecionado
-        self.calculate_regime_fields()
-
-    def validate_all_fields_for_save(self):
-        missing_fields = []
-
-        # Validações de campos gerais (matrícula, marca, etc.)
-        if not self.matricula.text().strip():
-            missing_fields.append("Matrícula")
-        if not self.marca.text().strip():
-            missing_fields.append("Marca")
-
-        # Validação das datas usando o método .date() do DateLineEdit
-        # Apenas se a data não estiver vazia, verifica se é válida.
-        # Se estiver vazia, o validador já a marca como Acceptable.
-        if self.dataCompra.text().strip() and not self.dataCompra.date().isValid():
-            QMessageBox.warning(self, "Data Inválida",
-                                "Por favor, insira uma 'Data da Compra' válida (DD-MM-AAAA) ou deixe o campo vazio.")
-            return False
-        if self.dataVenda.text().strip() and not self.dataVenda.date().isValid():
-            QMessageBox.warning(self, "Data Inválida",
-                                "Por favor, insira uma 'Data da Venda' válida (DD-MM-AAAA) ou deixe o campo vazio.")
-            return False
-
-        if missing_fields:
-            QMessageBox.warning(self, "Campos Obrigatórios em Falta",
-                                f"Por favor, preencha os seguintes campos obrigatórios:\n\n- " +
-                                "\n- ".join(missing_fields))
-            return False
-
-        # Valida os campos específicos do regime selecionado APENAS SE FOR SELECIONADO
-        current_regime_selected = None
+        regime_fiscal = ""
         if self.regime_geral_radio.isChecked():
-            current_regime_selected = "Regime Normal"
+            regime_fiscal = "Regime Normal"
         elif self.regime_lucro_tributavel_radio.isChecked():
-            current_regime_selected = "Margem"
+            regime_fiscal = "Margem"
 
-        if current_regime_selected == "Regime Normal":
-            # Aqui, taxa é um QComboBox, então passamos o widget diretamente
-            if not self.are_normal_regime_fields_valid():
-                QMessageBox.warning(self, "Campos em Falta para Regime Normal",
-                                    "Por favor, preencha 'Valor de Venda' e selecione uma 'Taxa' para o Regime Normal.")
-                return False
-
-        elif current_regime_selected == "Margem":
-            # Aqui, taxa é um QComboBox, então passamos o widget diretamente
-            if not self.are_margin_regime_fields_valid():
-                QMessageBox.warning(self, "Campos em Falta para Regime Margem",
-                                    "Por favor, preencha 'Valor de Compra', 'Valor de Venda' e selecione uma 'Taxa' para o Regime Margem.")
-                return False
-
-        return True
+        return {
+            "matricula": matricula,
+            "marca": marca,
+            "numeroQuadro": numero_quadro,
+            "isv": isv,
+            "nRegistoContabilidade": n_registo_contabilidade,
+            "dataCompra": data_compra,
+            "docCompra": doc_compra,
+            "tipoDocumento": tipo_documento,
+            "valorCompra": valor_compra,
+            "dataVenda": data_venda,
+            "docVenda": doc_venda,
+            "valorVenda": valor_venda,
+            "imposto": imposto,
+            "valorBase": valor_base,
+            "taxa": taxa,
+            "regime_fiscal": regime_fiscal
+        }
 
     def add_record(self):
-        self.calculate_regime_fields()
-        # Antes de adicionar/atualizar, chamar a validação final
-        if not self.validate_all_fields_for_save():
-            return  # Se a validação falhar, não prossegue com a gravação
+        data = self.get_form_data()
+
+        # Validação básica
+        if not all([data["matricula"], data["marca"], data["valorCompra"] is not None]):
+            QMessageBox.warning(self, "Campos Obrigatórios",
+                                "Matrícula, Marca e Valor de Compra são obrigatórios.")
+            return
+
+        if self.mode == "add":
+            if add_expense_to_db(data["matricula"], data["marca"], data["numeroQuadro"], data["isv"],
+                                 data["nRegistoContabilidade"], data["dataCompra"], data["docCompra"],
+                                 data["tipoDocumento"], data["valorCompra"], data["dataVenda"],
+                                 data["docVenda"], data["valorVenda"], data["imposto"],
+                                 data["valorBase"], data["taxa"], data["regime_fiscal"]):
+                QMessageBox.information(self, "Sucesso", "Registo adicionado com sucesso!")
+                self.parent_window.load_table_data()
+                self.accept()
+            else:
+                QMessageBox.critical(self, "Erro", "Erro ao adicionar registo.")
+        elif self.mode == "edit":
+            if self.initial_data and self.initial_data.get("id") is not None:
+                if update_expense_in_db(self.initial_data["id"], data):
+                    QMessageBox.information(self, "Sucesso", "Registo atualizado com sucesso!")
+                    self.parent_window.load_table_data()
+                    self.accept()
+                else:
+                    QMessageBox.critical(self, "Erro", "Erro ao atualizar registo.")
+            else:
+                QMessageBox.critical(self, "Erro", "ID do veículo não encontrado para edição.")
+
+    def update_regime_button_states(self):
+        """Atualiza o estado (enabled/disabled) dos radio buttons do regime fiscal
+        e reinicia a seleção se as condições não forem cumpridas."""
+
+        valor_compra_text = self.valorCompra.text().strip().replace(',', '.')
+        valor_venda_text = self.valorVenda.text().strip().replace(',', '.')
+        taxa_selecionada = self.taxa.currentText()
 
         try:
-            isv = self.get_float_value(self.isv)  # Ajustado para passar o widget
-            nRegistoContabilidade = self.nRegistoContabilidade.text()
-            numero_quadro = self.numeroQuadro.text()
+            valor_compra = float(valor_compra_text) if valor_compra_text else 0.0
+            valor_venda = float(valor_venda_text) if valor_venda_text else 0.0
+        except ValueError:
+            valor_compra = 0.0
+            valor_venda = 0.0
 
-            valor_compra = self.get_float_value(self.valorCompra)  # Ajustado para passar o widget
-            valor_venda = self.get_float_value(self.valorVenda)  # Ajustado para passar o widget
-            taxa = self.get_float_value(self.taxa)  # Obter valor do QComboBox usando get_float_value
+        # Condição para habilitar Regime Geral (Normal)
+        # Valor de venda preenchido E valor de compra preenchido E taxa selecionada diferente de "N/A"
+        enable_regime_geral = (
+                valor_compra > 0 and
+                valor_venda > 0 and
+                taxa_selecionada != "N/A"
+        )
 
-            valorBase_from_field = self.get_float_value(self.valorBase)  # Ajustado para passar o widget
-            imposto_from_field = self.get_float_value(self.imposto)  # Ajustado para passar o widget
+        # Condição para habilitar Margem
+        # Valor de venda preenchido E valor de compra preenchido E taxa selecionada diferente de "N/A"
+        # E (Valor Venda - Valor Compra) > 0
+        enable_regime_lucro = (
+                enable_regime_geral and
+                (valor_venda - valor_compra) > 0
+        )
 
-            print(f"[DEBUG - AddExpenseDialog] Saving - valorBase: {valorBase_from_field}")
-            print(f"[DEBUG - AddExpenseDialog] Saving - imposto: {imposto_from_field}")
-            print(f"[DEBUG - AddExpenseDialog] Saving - taxa: {taxa}")
+        # Aplicar estados
+        self.regime_geral_radio.setEnabled(enable_regime_geral)
+        self.regime_lucro_tributavel_radio.setEnabled(enable_regime_lucro)
 
-            # Obter a string da data do DateLineEdit (já formatada para DD-MM-AAAA ou vazia)
-            data_compra_ddmmyyyy = self.dataCompra.text()
-            data_venda_ddmmyyyy = self.dataVenda.text()
+        # Lógica para redefinir seleção se as condições não forem mais válidas
+        # Se um regime estava selecionado e agora está desabilitado, desmarca-o
+        if self.regime_geral_radio.isChecked() and not enable_regime_geral:
+            self.regime_geral_radio.setChecked(False)
+            self.last_valid_regime_radio = None  # Reset do último regime válido
+            print("[DEBUG - AddExpenseDialog] Regime Normal desmarcado (condições não cumpridas).")
 
-            # Converter para yyyy-MM-dd para armazenar no DB
-            data_compra_db = ""
-            if data_compra_ddmmyyyy:
-                qdate_compra = QDate.fromString(data_compra_ddmmyyyy, "dd-MM-yyyy")
-                if qdate_compra.isValid():
-                    data_compra_db = qdate_compra.toString("yyyy-MM-dd")
-            print(
-                f"[DEBUG - AddExpenseDialog] dataCompra_ddmmyyyy: '{data_compra_ddmmyyyy}' -> dataCompra_db: '{data_compra_db}'")
+        if self.regime_lucro_tributavel_radio.isChecked() and not enable_regime_lucro:
+            self.regime_lucro_tributavel_radio.setChecked(False)
+            self.last_valid_regime_radio = None  # Reset do último regime válido
+            print("[DEBUG - AddExpenseDialog] Regime Margem desmarcado (condições não cumpridas).")
 
-            data_venda_db = ""
-            if data_venda_ddmmyyyy:
-                qdate_venda = QDate.fromString(data_venda_ddmmyyyy, "dd-MM-yyyy")
-                if qdate_venda.isValid():
-                    data_venda_db = qdate_venda.toString("yyyy-MM-dd")
-            print(
-                f"[DEBUG - AddExpenseDialog] dataVenda_ddmmyyyy: '{data_venda_ddmmyyyy}' -> dataVenda_db: '{data_venda_db}'")
+        # Se nenhum regime estiver selecionado e um for agora habilitado, e havia um último válido, seleciona-o
+        if not self.regime_geral_radio.isChecked() and not self.regime_lucro_tributavel_radio.isChecked():
+            if self.last_valid_regime_radio:
+                if self.last_valid_regime_radio == self.regime_geral_radio and enable_regime_geral:
+                    self.regime_geral_radio.setChecked(True)
+                    print("[DEBUG - AddExpenseDialog] Restaurado Regime Normal (último válido).")
+                elif self.last_valid_regime_radio == self.regime_lucro_tributavel_radio and enable_regime_lucro:
+                    self.regime_lucro_tributavel_radio.setChecked(True)
+                    print("[DEBUG - AddExpenseDialog] Restaurado Regime Margem (último válido).")
+            # Se não havia um último regime válido, ou ele não pode ser restaurado, não fazemos nada,
+            # deixando o utilizador escolher.
 
-            regime_fiscal = ""
-            if self.regime_geral_radio.isChecked():
-                regime_fiscal = "Regime Normal"
-            elif self.regime_lucro_tributavel_radio.isChecked():
-                regime_fiscal = "Margem"
+        self.calculate_regime_fields()  # Recalcula após mudança de estado/seleção
 
-            if self.mode == "edit":
-                success = update_expense_in_db(self.initial_data["id"], {
-                    "matricula": self.matricula.text(),
-                    "marca": self.marca.text(),
-                    "numeroQuadro": numero_quadro,
-                    "isv": isv,
-                    "nRegistoContabilidade": nRegistoContabilidade,
-                    "dataCompra": data_compra_db,  # Salvar no DB como yyyy-MM-dd
-                    "docCompra": self.docCompra.text(),
-                    "tipoDocumento": self.tipoDocumento.currentText(),
-                    "valorCompra": valor_compra,
-                    "dataVenda": data_venda_db,  # Salvar no DB como yyyy-MM-dd
-                    "docVenda": self.docVenda.text(),
-                    "valorVenda": valor_venda,
-                    "imposto": imposto_from_field,
-                    "valorBase": valorBase_from_field,
-                    "taxa": taxa,
-                    "regime_fiscal": regime_fiscal
-                })
+    def handle_regime_selection(self):
+        """Atualiza o 'last_valid_regime_radio' quando o utilizador faz uma seleção."""
+        if self.regime_geral_radio.isChecked():
+            self.last_valid_regime_radio = self.regime_geral_radio
+            print("[DEBUG - AddExpenseDialog] last_valid_regime_radio definido para Regime Normal.")
+        elif self.regime_lucro_tributavel_radio.isChecked():
+            self.last_valid_regime_radio = self.regime_lucro_tributavel_radio
+            print("[DEBUG - AddExpenseDialog] last_valid_regime_radio definido para Margem.")
+        else:
+            self.last_valid_regime_radio = None
+            print("[DEBUG - AddExpenseDialog] Nenhum regime selecionado, last_valid_regime_radio redefinido.")
+        self.calculate_regime_fields()  # Recalcula após a seleção do utilizador
+
+    def calculate_regime_fields(self):
+        """Calcula o Valor Base e o Imposto com base nas novas regras."""
+        valor_compra_text = self.valorCompra.text().strip().replace(',', '.')
+        valor_venda_text = self.valorVenda.text().strip().replace(',', '.')
+        taxa_str = self.taxa.currentText()
+
+        try:
+            valor_compra = Decimal(valor_compra_text) if valor_compra_text else Decimal(0)
+            valor_venda = Decimal(valor_venda_text) if valor_venda_text else Decimal(0)
+            taxa = Decimal(taxa_str) if taxa_str != "N/A" else Decimal(0)
+        except Exception:
+            # Se a conversão falhar, limpa os campos de cálculo e sai
+            self.valorBase.setText("")
+            self.imposto.setText("")
+            return
+
+        valor_base = Decimal(0)
+        imposto = Decimal(0)
+
+        # NOVO: Esta função agora usa QLocale para formatação localizada (pontos de milhar, vírgula decimal)
+        def format_decimal_for_display(value):
+            locale = QLocale(QLocale.Language.Portuguese, QLocale.Country.Portugal)
+            # Define o comportamento de arredondamento para sempre ter duas casas decimais
+            return locale.toString(float(value.quantize(Decimal("0.01"))), 'f', 2)
+
+        if self.regime_geral_radio.isChecked():
+            # Regime Normal: valor base = valor venda, imposto = valor venda * (taxa / 100)
+            valor_base = valor_venda
+            imposto = valor_venda * (taxa / Decimal(100))
+            print(f"[DEBUG - Calc] Regime Normal - Venda: {valor_venda}, Taxa: {taxa}, Imposto: {imposto}")
+        elif self.regime_lucro_tributavel_radio.isChecked():
+            # Regime da Margem: valor base = valor venda - valor compra, imposto = valor base * (taxa / 100)
+            margem = valor_venda - valor_compra
+            if margem > 0:
+                valor_base = margem
+                imposto = margem * (taxa / Decimal(100))
             else:
-                print("\n--- Argumentos passados para add_expense_to_db ---")
-                print(f"matricula: {self.matricula.text()}")
-                print(f"marca: {self.marca.text()}")
-                print(f"numeroQuadro: {numero_quadro}")
-                print(f"isv: {isv}")
-                print(f"nRegistoContabilidade: {nRegistoContabilidade}")
-                print(f"dataCompra: {data_compra_db}")
-                print(f"docCompra: {self.docCompra.text()}")
-                print(f"tipoDocumento: {self.tipoDocumento.currentText()}")
-                print(f"valorCompra: {valor_compra}")
-                print(f"dataVenda: {data_venda_db}")
-                print(f"docVenda: {self.docVenda.text()}")
-                print(f"valorVenda: {valor_venda}")
-                print(f"imposto: {imposto_from_field}")
-                print(f"valorBase: {valorBase_from_field}")
-                print(f"taxa: {taxa}")
-                print(f"regime_fiscal: {regime_fiscal}")
-                print("--- Fim dos Argumentos ---")
+                # Se a margem for <= 0, não há imposto neste regime
+                valor_base = Decimal(0)
+                imposto = Decimal(0)
+            print(
+                f"[DEBUG - Calc] Regime Margem - Venda: {valor_venda}, Compra: {valor_compra}, Margem: {margem}, Taxa: {taxa}, Imposto: {imposto}")
+        else:
+            # Se nenhum regime estiver selecionado, os campos ficam vazios
+            self.valorBase.setText("")
+            self.imposto.setText("")
+            return  # Sai da função, pois não há cálculo a fazer
 
-                success = add_expense_to_db(
-                    self.matricula.text(), self.marca.text(), numero_quadro, isv,
-                    nRegistoContabilidade,
-                    data_compra_db, self.docCompra.text(),  # Salvar no DB como yyyy-MM-dd
-                    self.tipoDocumento.currentText(), valor_compra, data_venda_db,  # Salvar no DB como yyyy-MM-dd
-                    self.docVenda.text(), valor_venda, imposto_from_field, valorBase_from_field, taxa,
-                    regime_fiscal
-                )
+        # Arredondar para duas casas decimais
+        valor_base = valor_base.quantize(Decimal("0.01"))
+        imposto = imposto.quantize(Decimal("0.01"))
 
-            if success:
-                self.close()
-                self.parent_window.load_table_data()
-                QMessageBox.information(self, "Sucesso", "Registo guardado com sucesso!")
-            else:
-                QMessageBox.critical(self, "Erro", "Erro ao guardar registo")
-
-        except Exception as e:
-            QMessageBox.critical(self, "Erro", f"Ocorreu um erro: {e}")
-            import traceback
-            traceback.print_exc()
-
-    def closeEvent(self, event):
-        if self.parent_window is not None:
-            self.parent_window.setGraphicsEffect(None)
-        event.accept()
+        self.valorBase.setText(format_decimal_for_display(valor_base))
+        self.imposto.setText(format_decimal_for_display(imposto))
 
 
 class ExpenseApp(QWidget):
     def __init__(self):
         super().__init__()
         self.init_ui()
+        self.apply_styles()
         self.load_table_data()
+        self.showMaximized()  # Definir para iniciar em tela cheia
 
     def init_ui(self):
-        self.setWindowTitle("MBAuto")
-        self.setWindowState(Qt.WindowState.WindowMaximized)
+        self.setWindowTitle("MBAuto - Gestão de Despesas de Viaturas")
+        # Removido self.setGeometry, pois showMaximized() o substituirá
+        # self.setGeometry(100, 100, 1000, 600)  # Maior para acomodar as colunas
 
-        self.add_button = QPushButton("Add Expense")
-        self.delete_button = QPushButton("Delete Expense")
-
-        # Mantemos as 7 colunas visíveis na tabela principal
-        # As colunas da tabela principal são: ID, Matrícula, Marca, Valor de Compra, Documento de Venda, Valor de Venda, Imposto
-        self.table = QTableWidget(0, 7)
+        self.table = QTableWidget()
+        self.table.setColumnCount(7)  # ID, Matrícula, Marca, Valor Compra, Doc Venda, Valor Venda, Imposto
         self.table.setHorizontalHeaderLabels(
-            ["ID", "Matrícula", "Marca", "Valor de Compra", "Documento de Venda", "Valor de Venda", "Imposto"]
-            # Esta label continua a ser 'Imposto' para o que é exibido
-        )
-        self.table.setColumnHidden(0, True)  # Oculta a coluna ID
-        self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
-        self.table.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
+            ["ID", "Matrícula", "Marca", "Valor Compra", "Doc. Venda", "Valor Venda", "Imposto"])
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
-        self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
-        self.table.cellDoubleClicked.connect(self.open_edit_expense_dialog)
+        self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)  # Make table non-editable
+        self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)  # Selects entire row
 
-        self.add_button.clicked.connect(self.show_add_expense_dialog)
+        # --- CONECTAR O SINAL DE DUPLO CLIQUE ---
+        self.table.doubleClicked.connect(self.show_edit_dialog)
+
+        # Hide the ID column
+        self.table.setColumnHidden(0, True)
+
+        self.add_button = QPushButton("Adicionar Registo")
+        # self.edit_button = QPushButton("Editar Registo") # Removido o botão de editar
+        self.delete_button = QPushButton("Apagar Registo")
+        self.search_input = QLineEdit()
+        self.search_input.setPlaceholderText("Pesquisar por Matrícula ou Marca...")
+        self.search_button = QPushButton("Pesquisar")
+
+        self.add_button.clicked.connect(self.show_add_dialog)
+        # self.edit_button.clicked.connect(self.show_edit_dialog) # Removido a conexão para o botão de editar
         self.delete_button.clicked.connect(self.delete_expense)
+        self.search_button.clicked.connect(self.search_expenses)
 
-        self.setup_layout()
+        # Layouts
+        button_layout = QHBoxLayout()
+        button_layout.addWidget(self.add_button)
+        # button_layout.addWidget(self.edit_button) # Removido o botão de editar
+        button_layout.addWidget(self.delete_button)
+        button_layout.addStretch(1)  # Push buttons to the left
 
-        self.apply_styles()
+        search_layout = QHBoxLayout()
+        search_layout.addWidget(self.search_input)
+        search_layout.addWidget(self.search_button)
 
-    def show_add_expense_dialog(self):
-        self.add_expense_dialog = AddExpenseDialog(self)
-        opacity_effect = QGraphicsOpacityEffect()
-        opacity_effect.setOpacity(0.5)
-        self.setGraphicsEffect(opacity_effect)
-        self.add_expense_dialog.exec()
+        main_layout = QVBoxLayout()
+        main_layout.addLayout(button_layout)
+        main_layout.addLayout(search_layout)
+        main_layout.addWidget(self.table)
 
-    def open_edit_expense_dialog(self, row, column):
-        vehicle_id = int(self.table.item(row, 0).text())
-        initial_data = fetch_vehicle_by_id(vehicle_id)
-        print(f"[DEBUG - ExpenseApp] Fetched initial_data for ID {vehicle_id}: {initial_data}")
-
-        if initial_data:
-            dialog = AddExpenseDialog(self, mode="edit", initial_data=initial_data)
-            opacity_effect = QGraphicsOpacityEffect()
-            opacity_effect.setOpacity(0.5)
-            self.setGraphicsEffect(opacity_effect)
-            dialog.exec()
-        else:
-            QMessageBox.critical(self, "Erro", "Não foi possível carregar os dados do veículo.")
-
-    def setup_layout(self):
-        layout = QVBoxLayout()
-        row1 = QHBoxLayout()
-
-        row1.addWidget(self.add_button)
-        row1.addWidget(self.delete_button)
-
-        layout.addLayout(row1)
-        layout.addWidget(self.table)
-
-        self.setLayout(layout)
+        self.setLayout(main_layout)
 
     def apply_styles(self):
-        # Apenas um ajuste para o estilo do QLineEdit na classe principal,
-        # pois o DateLineEdit tem seu próprio estilo para o QLineEdit interno.
         self.setStyleSheet("""
     /* Base styling */
     QWidget {
@@ -1177,7 +1096,7 @@ class ExpenseApp(QWidget):
     }
 
     /* Styling for input fields */
-    QLineEdit, QComboBox { /* Apply this to regular QLineEdit and QComboBox */
+    QLineEdit, QComboBox {
         background-color: #ffffff;
         font-size: 14px;
         color: #333;
@@ -1186,10 +1105,10 @@ class ExpenseApp(QWidget):
         padding: 5px;
     }
     QLineEdit:hover, QComboBox:hover {
-        border: 1px solid #4caf50; /* Borda verde no hover */
+        border: 1px solid #4caf50;
     }
     QLineEdit:focus, QComboBox:focus {
-        border: 1px solid #2a9d8f; /* Borda verde mais escura no focus */
+        border: 1px solid #2a9d8f;
         background-color: #f5f9fc;
     }
 
@@ -1201,10 +1120,20 @@ class ExpenseApp(QWidget):
         font-size: 14px;
         border: 1px solid #cfd9e1;
     }
+
+    /* A COR DE SELEÇÃO DEVE SER MAIS ESPECÍFICA PARA SOBREPÔR OUTRAS CORES */
     QTableWidget::item:selected {
-        background-color: #d0d7de;
+        background-color: #d0d7de; /* Cor de seleção cinza mais clara */
         color: #000000;
     }
+
+    /* NOVO: Estilo para itens vendidos - será sobreposto por ::item:selected */
+    /* Este estilo aplica-se ao item individual, o que pode ser mais robusto */
+    QTableWidget::item[sold="true"] { /* Usamos uma propriedade dinâmica 'sold' */
+        background-color: #d4edda; /* Verde pastel para vendido */
+        color: #333; /* Cor do texto para contraste */
+    }
+
 
     QHeaderView::section {
         background-color: #4caf50;
@@ -1230,7 +1159,6 @@ class ExpenseApp(QWidget):
     }
 
     /* Buttons */
-    /* Este estilo geral para QPushButton é apenas para botões fora do DateLineEdit */
     QPushButton {
         background-color: #4caf50;
         color: white;
@@ -1301,87 +1229,139 @@ class ExpenseApp(QWidget):
         border-radius: 5px;
     }
 
-    QCalendarWidget QWidget#qt_calendar_navigationbar { /* Barra de navegação */
-        background-color: #4caf50; /* Verde principal para a barra inteira */
-        color: white; /* Cor do texto para toda a barra */
+    /* Barra de navegação do calendário (onde está o mês e ano) */
+    QCalendarWidget QWidget#qt_calendar_navigationbar {
+        background-color: #e8ecf4; /* Cor de fundo que você definiu como ideal */
+        color: #333; /* Cor do texto para toda a barra - ajustado para o novo fundo */
         border-top-left-radius: 5px;
         border-top-right-radius: 5px;
-    }
-    /* Estilo dos botões de navegação e ano/mês */
-    QCalendarWidget QWidget#qt_calendar_navigationbar QPushButton {
-        background-color: #4caf50; /* Verde */
-        color: white;
-        border: 1px solid #3d8b40;
-        border-radius: 3px;
-        font-size: 16px;
-        padding: 5px;
-    }
-    QCalendarWidget QWidget#qt_calendar_navigationbar QPushButton:hover {
-        background-color: #45a049;
-    }
-    QCalendarWidget QWidget#qt_calendar_navigationbar QPushButton:pressed {
-        background-color: #3d8b40;
-    }
-    /* Spinbox de ano e mês no calendário */
-    QCalendarWidget QSpinBox {
-        border: 1px solid #b0bfc6;
-        border-radius: 3px;
-        padding-right: 15px; /* Espaço para o botão de seta */
-        color: white; /* Cor do texto do spinbox */
-        background-color: #4caf50; /* Fundo verde para o spinbox */
-    }
-    QCalendarWidget QSpinBox::up-button, QCalendarWidget QSpinBox::down-button {
-        width: 16px;
-        border: 1px solid #b0bfc6;
-        border-radius: 3px;
-        background-color: #f0f0f0;
-    }
-    QCalendarWidget QSpinBox::up-arrow, QCalendarWidget QSpinBox::down-arrow {
-        width: 10px;
-        height: 10px;
-    }
-    QCalendarWidget QSpinBox::up-button:hover, QCalendarWidget QSpinBox::down-button:hover {
-        background-color: #e0e0e0;
+        border: none; /* Remover qualquer borda residual */
     }
 
-    QCalendarWidget QAbstractItemView { /* Grid do calendário */
-        selection-background-color: #d0d7de; /* Cor de fundo da seleção ao passar o rato */
-        selection-color: #000000; /* Cor do texto da seleção ao passar o rato */
-        outline: none; /* Remover a borda de foco */
+    /* Estilo dos botões de navegação (setas) e spinbox de ano/mês */
+    QCalendarWidget QAbstractSpinBox,
+    QCalendarWidget QPushButton {
+        background-color: #e8ecf4; /* Mesma cor da barra de navegação */
+        color: #4caf50; /* Cor do texto verde */
+        border: 1px solid #b0bfc6; /* Borda cinza suave */
+        border-radius: 3px;
+        font-size: 14px; /* Ajuste para caber melhor */
+        padding: 3px 5px; /* Reduzir padding para os botões e spinbox */
     }
+    QCalendarWidget QAbstractSpinBox:hover,
+    QCalendarWidget QPushButton:hover {
+        background-color: #dbe2ea; /* Um tom ligeiramente mais escuro no hover */
+    }
+    QCalendarWidget QAbstractSpinBox:pressed,
+    QCalendarWidget QPushButton:pressed {
+        background-color: #c9d0d9; /* Um tom ainda mais escuro no pressed */
+    }
+
+    /* Setas dentro do Spinbox */
+    QCalendarWidget QSpinBox::up-button,
+    QCalendarWidget QSpinBox::down-button {
+        subcontrol-origin: border;
+        subcontrol-position: right;
+        width: 16px;
+        border-left: 1px solid #b0bfc6; /* Borda para separar o botão */
+        background-color: #e8ecf4; /* Mesma cor da barra */
+        border-top-right-radius: 3px;
+        border-bottom-right-radius: 3px;
+    }
+    QCalendarWidget QSpinBox::up-button:hover,
+    QCalendarWidget QSpinBox::down-button:hover {
+        background-color: #dbe2ea;
+    }
+    QCalendarWidget QSpinBox::up-arrow,
+    QCalendarWidget QSpinBox::down-arrow {
+        background-color: transparent;
+        color: #4caf50; /* A cor da seta será o verde */
+    }
+
+    /* Cabeçalho da grelha do calendário (Dias da Semana - Seg, Ter, Qua, etc.) */
+    QCalendarWidget QAbstractItemView {
+        background-color: #ffffff; /* Fundo branco para toda a área dos dias */
+        selection-background-color: #a0d4a3; /* Fundo mais claro para dias selecionados */
+        selection-color: #000000; /* Cor do texto para dias selecionados */
+        outline: none; /* Remover a borda de foco */
+        border-bottom: 1px solid #e0e0e0; /* Linha de separação para o cabeçalho dos dias da semana */
+    }
+
+    QCalendarWidget QAbstractItemView QHeaderView::section {
+        background-color: #f0f0f0; /* Fundo cinza claro para a linha dos dias da semana */
+        color: #555555; /* Cor do texto para os dias da semana */
+        border: none;
+        padding: 5px;
+    }
+
     /* Estilo para o dia normal no calendário */
     QCalendarWidget QAbstractItemView:enabled {
-        color: #333; /* Cor do texto padrão para dias */
+        color: #333; /* Cor do texto padrão para os números dos dias */
     }
 
     QCalendarWidget QAbstractItemView:enabled:hover {
-        background-color: #f2f7fb; /* Cor de fundo ao passar o mouse */
+        background-color: #e6ffe6; /* Um verde muito claro no hover */
+        border-radius: 3px; /* Bordas arredondadas no hover */
     }
 
     QCalendarWidget QAbstractItemView:selected {
         background-color: #2a9d8f; /* Cor do fundo do dia selecionado (verde mais escuro) */
         color: white; /* Cor do texto do dia selecionado */
+        border-radius: 3px; /* Bordas arredondadas para seleção */
     }
 
-    /* Para o dia de hoje - agora será um círculo cinza suave com borda verde */
+    /* Para o dia de hoje - AGORA COM CIRCULO VERDE MAIS CLARO */
     QCalendarWidget QAbstractItemView:!selected:focus { /* Dia de hoje, se não estiver selecionado */
-        background-color: #e0e0e0; /* Cinza suave para o dia de hoje */
+        background-color: #d4f7d4; /* Um verde pastel */
         color: #000000;
         border: 1px solid #4caf50; /* Borda verde suave */
         border-radius: 50%; /* Faz um círculo */
     }
+
     /* Para a borda à volta do número do dia */
     QCalendarWidget QCalendarView::item {
         border-radius: 0px; /* Reset para itens normais */
+        padding: 4px; /* Padding para espaçar os números */
+    }
+
+    /* Dias desabilitados (fora do mês atual) */
+    QCalendarWidget QAbstractItemView:disabled {
+        color: #cccccc; /* Cor cinza para dias fora do mês */
     }
 """)
 
     def load_table_data(self):
+        # expense agora inclui dataVenda como o último elemento
         expenses = fetch_expenses()
         self.table.setRowCount(0)
+
+        # Colunas visíveis na tabela: ID, Matrícula, Marca, Valor Compra, Doc Venda, Valor Venda, Imposto
+        # total de 7 colunas visíveis + a dataVenda que será a 8ª coluna (índice 7) do `expense`
+        # para a lógica do vendido
+
         for row_idx, expense in enumerate(expenses):
             self.table.insertRow(row_idx)
-            for col_idx, data in enumerate(expense):
+
+            # Extrair os campos relevantes para a condição "vendido"
+            data_venda = expense[7]  # dataVenda é o último elemento retornado por fetch_expenses
+            valor_venda = expense[5]  # valorVenda
+            doc_venda = expense[4]  # docVenda
+
+            # Lógica para determinar se o veículo está vendido
+            # Consideramos vendido se pelo menos um dos campos de venda estiver preenchido
+            is_sold = bool(data_venda) or \
+                      (valor_venda is not None and str(valor_venda).strip() != "" and float(valor_venda) > 0) or \
+                      (doc_venda is not None and str(doc_venda).strip() != "")
+
+            # Definir a cor de fundo para a linha inteira se o veículo estiver vendido
+            # O ideal é aplicar a cor a cada item individualmente para garantir que o estilo de seleção sobrepõe
+            sold_background_color = QColor("#d4edda")  # ou QColor("#e0ffe0") para um verde mais suave ainda
+
+            # Iterar apenas sobre as colunas visíveis para definir os itens da tabela
+            # As colunas visíveis são de 0 a 6
+            for col_idx in range(7):  # 0 a 6 (7 colunas)
+                data = expense[col_idx]  # Acessa os dados originais da linha
+
                 # Formata colunas específicas com duas casas decimais se forem numéricas
                 # Colunas: 3 (Valor Compra), 5 (Valor Venda), 6 (Imposto)
                 if col_idx in [3, 5, 6]:
@@ -1390,15 +1370,48 @@ class ExpenseApp(QWidget):
                         if data is None or (isinstance(data, str) and not str(data).strip()):
                             formatted_data = ""
                         else:
-                            # NOVO: Usa QLocale para formatar números na tabela
+                            # Usa QLocale para formatar números na tabela
                             locale = QLocale(QLocale.Language.Portuguese, QLocale.Country.Portugal)
                             formatted_data = locale.toString(float(data), 'f', 2)
-                        self.table.setItem(row_idx, col_idx, QTableWidgetItem(formatted_data))
+                        item = QTableWidgetItem(formatted_data)
                     except (ValueError, TypeError):
                         # Se não for um número válido, exibe como string
-                        self.table.setItem(row_idx, col_idx, QTableWidgetItem(str(data)))
+                        item = QTableWidgetItem(str(data))
                 else:
-                    self.table.setItem(row_idx, col_idx, QTableWidgetItem(str(data)))
+                    item = QTableWidgetItem(str(data))
+
+                # Se o veículo estiver vendido, aplicar o background à célula
+                if is_sold:
+                    item.setBackground(sold_background_color)
+                    # Opcional: Para ter a certeza que o texto tem boa visibilidade
+                    # item.setForeground(QColor("#333333"))
+                    # Definir uma propriedade dinâmica para uso no CSS
+                    item.setData(Qt.ItemDataRole.UserRole, True)  # Exemplo de como usar UserRole
+                    # Ou de forma mais direta para CSS via propriedade:
+                    # item.setData(Qt.ItemDataRole.UserRole + 1, "true") # Para o QTableWidget::item[sold="true"]
+
+                self.table.setItem(row_idx, col_idx, item)
+
+    def show_add_dialog(self):
+        dialog = AddExpenseDialog(self, mode="add")
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            self.load_table_data()
+
+    def show_edit_dialog(self):
+        selected_row = self.table.currentRow()
+        if selected_row == -1:
+            QMessageBox.warning(self, "No Selection", "Please select a record to edit.")
+            return
+
+        expense_id = int(self.table.item(selected_row, 0).text())
+        initial_data = fetch_vehicle_by_id(expense_id)
+
+        if initial_data:
+            dialog = AddExpenseDialog(self, mode="edit", initial_data=initial_data)
+            if dialog.exec() == QDialog.DialogCode.Accepted:
+                self.load_table_data()
+        else:
+            QMessageBox.critical(self, "Erro", "Não foi possível carregar os dados do veículo para edição.")
 
     def delete_expense(self):
         selected_row = self.table.currentRow()
@@ -1414,3 +1427,58 @@ class ExpenseApp(QWidget):
             if delete_expense_from_db(expense_id):
                 self.load_table_data()
                 self.table.clearSelection()  # Deselects the row after deletion
+            else:
+                QMessageBox.critical(self, "Erro", "Erro ao apagar registo.")
+
+    def search_expenses(self):
+        search_text = self.search_input.text().strip().lower()
+        if not search_text:
+            self.load_table_data()  # If search box is empty, load all data
+            return
+
+        # Fetch all data and filter in memory for simplicity
+        all_expenses = fetch_expenses()
+        self.table.setRowCount(0)
+
+        row_idx = 0
+        for expense in all_expenses:
+            # Indices: 1 for Matrícula, 2 for Marca
+            matricula = str(expense[1]).lower()
+            marca = str(expense[2]).lower()
+
+            if search_text in matricula or search_text in marca:
+                self.table.insertRow(row_idx)
+
+                # Extrair os campos relevantes para a condição "vendido"
+                data_venda = expense[7]  # dataVenda é o último elemento retornado por fetch_expenses
+                valor_venda = expense[5]  # valorVenda
+                doc_venda = expense[4]  # docVenda
+
+                # Lógica para determinar se o veículo está vendido
+                is_sold = bool(data_venda) or \
+                          (valor_venda is not None and str(valor_venda).strip() != "" and float(valor_venda) > 0) or \
+                          (doc_venda is not None and str(doc_venda).strip() != "")
+
+                sold_background_color = QColor("#d4edda")
+
+                for col_id in range(7):  # Columns 0 to 6 are visible
+                    data = expense[col_id]
+
+                    if col_id in [3, 5, 6]:  # Valor Compra, Valor Venda, Imposto
+                        try:
+                            if data is None or (isinstance(data, str) and not str(data).strip()):
+                                formatted_data = ""
+                            else:
+                                locale = QLocale(QLocale.Language.Portuguese, QLocale.Country.Portugal)
+                                formatted_data = locale.toString(float(data), 'f', 2)
+                            item = QTableWidgetItem(formatted_data)
+                        except (ValueError, TypeError):
+                            item = QTableWidgetItem(str(data))
+                    else:
+                        item = QTableWidgetItem(str(data))
+
+                    if is_sold:
+                        item.setBackground(sold_background_color)
+                        item.setData(Qt.ItemDataRole.UserRole, True)  # Set custom role data
+                    self.table.setItem(row_idx, col_id, item)
+                row_idx += 1
