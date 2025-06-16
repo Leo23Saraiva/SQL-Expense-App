@@ -5,7 +5,7 @@ from PyQt6.QtWidgets import (
     QRadioButton, QCalendarWidget
 )
 from PyQt6.QtCore import QDate, Qt, QLocale, QEvent
-from PyQt6.QtGui import QValidator, QColor  # Importar QColor
+from PyQt6.QtGui import QValidator, QColor
 from decimal import Decimal
 
 from database import fetch_expenses, add_expense_to_db, delete_expense_from_db, update_expense_in_db, \
@@ -169,7 +169,8 @@ class DateLineEdit(QHBoxLayout):
             # Se for incompleta, tenta parsear para ver se é algo razoável
             qdate = self.date()
             if not qdate.isValid():
-                print(f"[DEBUG - DateLineEdit] FocusOut: Data '{current_text}' incompleta e inválida. Limpando campo.")
+                print(
+                    f"[DEBUG - DateLineEdit] FocusOut: Data '{current_text}' incompleta e inválida. Limpando campo.")
                 self.date_input.clear()  # Limpa se for incompleta e não puder ser uma data válida
             else:
                 print(
@@ -365,7 +366,7 @@ class AddExpenseDialog(QDialog):
         data_compra_str = self.initial_data.get("dataCompra", "")
         print(f"[DEBUG - AddExpenseDialog] dataCompra_str from DB: '{data_compra_str}'")
         # Usar o setter do DateLineEdit que lida com QDate ou string vazia
-        # O setText do DateLineEdit vai agora fazer a conversão de yyyy-MM-dd para dd-MM-yyyy
+        # O setText do DateLineEdit vai agora fazer a conversão de `yyyy-MM-dd` para `dd-MM-yyyy`
         self.dataCompra.setText(data_compra_str)
         print(f"[DEBUG - AddExpenseDialog] After dataCompra.setText, field content: '{self.dataCompra.text()}'")
 
@@ -627,6 +628,45 @@ class AddExpenseDialog(QDialog):
         background-color: #c8c8c8;
         color: #6e6e6e;
     }
+
+    /* Estilo para o botão de Limpar Pesquisa (o "X") */
+    QPushButton#clearSearchButton {
+        background-color: transparent; /* Fundo transparente */
+        border: none; /* Sem borda */
+        color: #555555; /* Cor cinza escura para o 'X' */
+        padding: 0px 5px; /* Padding ajustado para ser mais compacto */
+        border-radius: 5px;
+        font-size: 18px; /* Tamanho maior para o 'X' para melhor visibilidade */
+        font-weight: bold;
+        min-width: 25px; /* Largura mínima menor */
+    }
+    QPushButton#clearSearchButton:hover {
+        background-color: #e0e0e0; /* Um cinza claro no hover */
+        border-radius: 5px; /* Manter bordas arredondadas no hover */
+    }
+    QPushButton#clearSearchButton:pressed {
+        background-color: #cccccc; /* Um cinza mais escuro no pressed */
+    }
+
+    /* NOVO: Estilo para o botão de Pesquisa (a "Lupa") */
+    QPushButton#searchButton {
+        background-color: transparent; /* Fundo transparente */
+        border: none; /* Sem borda */
+        color: #555555; /* Cor cinza escura para a 'Lupa' */
+        padding: 0px 5px; /* Padding ajustado para ser mais compacto */
+        border-radius: 5px;
+        font-size: 18px; /* Tamanho maior para a 'Lupa' */
+        font-weight: bold;
+        min-width: 25px; /* Largura mínima menor */
+    }
+    QPushButton#searchButton:hover {
+        background-color: #e0e0e0; /* Um cinza claro no hover */
+        border-radius: 5px;
+    }
+    QPushButton#searchButton:pressed {
+        background-color: #cccccc; /* Um cinza mais escuro no pressed */
+    }
+
 
     /* Tooltip styling */
     QToolTip {
@@ -1048,27 +1088,39 @@ class ExpenseApp(QWidget):
         self.table.setColumnHidden(0, True)
 
         self.add_button = QPushButton("Adicionar Registo")
-        # self.edit_button = QPushButton("Editar Registo") # Removido o botão de editar
         self.delete_button = QPushButton("Apagar Registo")
         self.search_input = QLineEdit()
         self.search_input.setPlaceholderText("Pesquisar por Matrícula ou Marca...")
-        self.search_button = QPushButton("Pesquisar")
 
-        self.add_button.clicked.connect(self.show_add_dialog)
-        # self.edit_button.clicked.connect(self.show_edit_dialog) # Removido a conexão para o botão de editar
-        self.delete_button.clicked.connect(self.delete_expense)
+        # Conectar o sinal returnPressed para pesquisar ao pressionar Enter
+        self.search_input.returnPressed.connect(self.search_expenses)
+
+        # Botão de limpar pesquisa (X)
+        self.clear_search_button = QPushButton("X")
+        self.clear_search_button.setObjectName("clearSearchButton")  # Para aplicar estilo CSS específico
+        self.clear_search_button.setToolTip("Limpar pesquisa e mostrar todos os registos")
+        self.clear_search_button.clicked.connect(self.clear_search)
+
+        # Botão de pesquisa (Lupa)
+        self.search_button = QPushButton("🔍")  # Ícone de lupa (Unicode)
+        self.search_button.setObjectName("searchButton")  # Para aplicar estilo CSS específico
+        self.search_button.setToolTip("Pesquisar registos")
         self.search_button.clicked.connect(self.search_expenses)
 
         # Layouts
         button_layout = QHBoxLayout()
         button_layout.addWidget(self.add_button)
-        # button_layout.addWidget(self.edit_button) # Removido o botão de editar
         button_layout.addWidget(self.delete_button)
         button_layout.addStretch(1)  # Push buttons to the left
 
         search_layout = QHBoxLayout()
         search_layout.addWidget(self.search_input)
-        search_layout.addWidget(self.search_button)
+        search_layout.addWidget(self.clear_search_button)  # X antes da lupa
+        search_layout.addWidget(self.search_button)  # Botão de pesquisa (Lupa)
+
+        self.add_button.clicked.connect(self.show_add_dialog)
+        self.delete_button.clicked.connect(self.delete_expense)
+        # self.search_button.clicked.connect(self.search_expenses) # Conectado acima
 
         main_layout = QVBoxLayout()
         main_layout.addLayout(button_layout)
@@ -1179,6 +1231,45 @@ class ExpenseApp(QWidget):
         color: #6e6e6e;
     }
 
+    /* Estilo para o botão de Limpar Pesquisa (o "X") */
+    QPushButton#clearSearchButton {
+        background-color: transparent;
+        border: none;
+        color: #555555;
+        padding: 0px 5px;
+        border-radius: 5px;
+        font-size: 18px;
+        font-weight: bold;
+        min-width: 25px;
+    }
+    QPushButton#clearSearchButton:hover {
+        background-color: #e0e0e0;
+        border-radius: 5px;
+    }
+    QPushButton#clearSearchButton:pressed {
+        background-color: #cccccc;
+    }
+
+    /* NOVO: Estilo para o botão de Pesquisa (a "Lupa") */
+    QPushButton#searchButton {
+        background-color: transparent;
+        border: none;
+        color: #555555;
+        padding: 0px 5px;
+        border-radius: 5px;
+        font-size: 18px;
+        font-weight: bold;
+        min-width: 25px;
+    }
+    QPushButton#searchButton:hover {
+        background-color: #e0e0e0;
+        border-radius: 5px;
+    }
+    QPushButton#searchButton:pressed {
+        background-color: #cccccc;
+    }
+
+
     /* Tooltip styling */
     QToolTip {
         background-color: #2c3e50;
@@ -1191,35 +1282,35 @@ class ExpenseApp(QWidget):
 
     /* ESTILO PARA QRadioButton */
     QRadioButton {
-        color: #333; /* Cor do texto mais escura para melhor legibilidade */
-        padding: 4px 0px; /* Mantém o padding */
+        color: #333;
+        padding: 4px 0px;
     }
 
     QRadioButton::indicator {
         width: 16px;
         height: 16px;
-        border-radius: 8px; /* Mantém o indicador redondo */
-        border: 2px solid #555555; /* Borda mais escura para o indicador (normal) */
-        background-color: #ffffff; /* Fundo branco para o indicador (normal) */
+        border-radius: 8px;
+        border: 2px solid #555555;
+        background-color: #ffffff;
     }
 
     QRadioButton::indicator:hover {
-        border: 2px solid #4caf50; /* Borda verde mais escura no hover */
+        border: 2px solid #4caf50;
     }
 
     QRadioButton::indicator:checked {
-        background-color: #4caf50; /* Preenchimento verde quando selecionado */
-        border: 2px solid #2a9d8f; /* Borda verde mais escura quando selecionado */
+        background-color: #4caf50;
+        border: 2px solid #2a9d8f;
     }
 
     /* NOVO ESTILO: QRadioButton quando desabilitado */
     QRadioButton:disabled {
-        color: #a0a0a0; /* Cor do texto cinzento */
+        color: #a0a0a0;
     }
 
     QRadioButton::indicator:disabled {
-        background-color: #e0e0e0; /* Fundo cinzento claro para o indicador */
-        border: 2px solid #b0b0b0; /* Borda cinzenta mais escura */
+        background-color: #e0e0e0;
+        border: 2px solid #b0b0b0;
     }
 
     /* Estilo para QCalendarWidget */
@@ -1231,30 +1322,30 @@ class ExpenseApp(QWidget):
 
     /* Barra de navegação do calendário (onde está o mês e ano) */
     QCalendarWidget QWidget#qt_calendar_navigationbar {
-        background-color: #e8ecf4; /* Cor de fundo que você definiu como ideal */
-        color: #333; /* Cor do texto para toda a barra - ajustado para o novo fundo */
+        background-color: #e8ecf4;
+        color: #333;
         border-top-left-radius: 5px;
         border-top-right-radius: 5px;
-        border: none; /* Remover qualquer borda residual */
+        border: none;
     }
 
     /* Estilo dos botões de navegação (setas) e spinbox de ano/mês */
     QCalendarWidget QAbstractSpinBox,
     QCalendarWidget QPushButton {
-        background-color: #e8ecf4; /* Mesma cor da barra de navegação */
-        color: #4caf50; /* Cor do texto verde */
-        border: 1px solid #b0bfc6; /* Borda cinza suave */
+        background-color: #e8ecf4;
+        color: #4caf50;
+        border: 1px solid #b0bfc6;
         border-radius: 3px;
-        font-size: 14px; /* Ajuste para caber melhor */
-        padding: 3px 5px; /* Reduzir padding para os botões e spinbox */
+        font-size: 14px;
+        padding: 3px 5px;
     }
     QCalendarWidget QAbstractSpinBox:hover,
     QCalendarWidget QPushButton:hover {
-        background-color: #dbe2ea; /* Um tom ligeiramente mais escuro no hover */
+        background-color: #dbe2ea;
     }
     QCalendarWidget QAbstractSpinBox:pressed,
     QCalendarWidget QPushButton:pressed {
-        background-color: #c9d0d9; /* Um tom ainda mais escuro no pressed */
+        background-color: #c9d0d9;
     }
 
     /* Setas dentro do Spinbox */
@@ -1263,8 +1354,8 @@ class ExpenseApp(QWidget):
         subcontrol-origin: border;
         subcontrol-position: right;
         width: 16px;
-        border-left: 1px solid #b0bfc6; /* Borda para separar o botão */
-        background-color: #e8ecf4; /* Mesma cor da barra */
+        border-left: 1px solid #b0bfc6;
+        background-color: #e8ecf4;
         border-top-right-radius: 3px;
         border-bottom-right-radius: 3px;
     }
@@ -1275,58 +1366,1864 @@ class ExpenseApp(QWidget):
     QCalendarWidget QSpinBox::up-arrow,
     QCalendarWidget QSpinBox::down-arrow {
         background-color: transparent;
-        color: #4caf50; /* A cor da seta será o verde */
+        color: #4caf50;
     }
 
     /* Cabeçalho da grelha do calendário (Dias da Semana - Seg, Ter, Qua, etc.) */
     QCalendarWidget QAbstractItemView {
-        background-color: #ffffff; /* Fundo branco para toda a área dos dias */
-        selection-background-color: #a0d4a3; /* Fundo mais claro para dias selecionados */
-        selection-color: #000000; /* Cor do texto para dias selecionados */
-        outline: none; /* Remover a borda de foco */
-        border-bottom: 1px solid #e0e0e0; /* Linha de separação para o cabeçalho dos dias da semana */
+        background-color: #ffffff;
+        selection-background-color: #a0d4a3;
+        selection-color: #000000;
+        outline: none;
+        border-bottom: 1px solid #e0e0e0;
     }
 
     QCalendarWidget QAbstractItemView QHeaderView::section {
-        background-color: #f0f0f0; /* Fundo cinza claro para a linha dos dias da semana */
-        color: #555555; /* Cor do texto para os dias da semana */
+        background-color: #f0f0f0;
+        color: #555555;
         border: none;
         padding: 5px;
     }
 
     /* Estilo para o dia normal no calendário */
     QCalendarWidget QAbstractItemView:enabled {
-        color: #333; /* Cor do texto padrão para os números dos dias */
+        color: #333;
     }
 
     QCalendarWidget QAbstractItemView:enabled:hover {
-        background-color: #e6ffe6; /* Um verde muito claro no hover */
-        border-radius: 3px; /* Bordas arredondadas no hover */
+        background-color: #e6ffe6;
+        border-radius: 3px;
     }
 
     QCalendarWidget QAbstractItemView:selected {
-        background-color: #2a9d8f; /* Cor do fundo do dia selecionado (verde mais escuro) */
-        color: white; /* Cor do texto do dia selecionado */
-        border-radius: 3px; /* Bordas arredondadas para seleção */
+        background-color: #2a9d8f;
+        color: white;
+        border-radius: 3px;
     }
 
     /* Para o dia de hoje - AGORA COM CIRCULO VERDE MAIS CLARO */
-    QCalendarWidget QAbstractItemView:!selected:focus { /* Dia de hoje, se não estiver selecionado */
-        background-color: #d4f7d4; /* Um verde pastel */
+    QCalendarWidget QAbstractItemView:!selected:focus {
+        background-color: #d4f7d4;
         color: #000000;
-        border: 1px solid #4caf50; /* Borda verde suave */
-        border-radius: 50%; /* Faz um círculo */
+        border: 1px solid #4caf50;
+        border-radius: 50%;
     }
 
     /* Para a borda à volta do número do dia */
     QCalendarWidget QCalendarView::item {
-        border-radius: 0px; /* Reset para itens normais */
-        padding: 4px; /* Padding para espaçar os números */
+        border-radius: 0px;
+        padding: 4px;
     }
 
     /* Dias desabilitados (fora do mês atual) */
     QCalendarWidget QAbstractItemView:disabled {
-        color: #cccccc; /* Cor cinza para dias fora do mês */
+        color: #cccccc;
+    }
+""")
+
+    def get_form_data(self):
+        # Esta função já estava completa e não precisa de alterações relacionadas a "vendido"
+        matricula = self.matricula.text().strip()
+        marca = self.marca.text().strip()
+        numero_quadro = self.numeroQuadro.text().strip()
+
+        # Funções para conversão segura de campos numéricos
+        def parse_float(text):
+            locale = QLocale(QLocale.Language.Portuguese, QLocale.Country.Portugal)
+            try:
+                # Remove espaços em branco
+                clean_text = text.strip()
+                if not clean_text:  # Se for string vazia após strip, retorna None
+                    return None
+                # Converte para float usando a localidade correta para vírgula/ponto decimal
+                return locale.toFloat(clean_text)[0]  # [0] para obter o float do tuple (float, bool)
+            except Exception as e:
+                print(f"Erro ao converter '{text}' para float: {e}")
+                return None
+
+        def parse_int(text):
+            try:
+                # Remove espaços em branco
+                clean_text = text.strip()
+                if not clean_text:  # Se for string vazia após strip, retorna None
+                    return None
+                return int(clean_text)
+            except ValueError:
+                return None
+
+        isv = parse_float(self.isv.text())
+        n_registo_contabilidade = self.nRegistoContabilidade.text().strip()  # Manter como string
+
+        # Obter data da compra do DateLineEdit
+        data_compra_qdate = self.dataCompra.date()
+        data_compra = data_compra_qdate.toString("yyyy-MM-dd") if data_compra_qdate.isValid() else None
+
+        doc_compra = self.docCompra.text().strip()
+        tipo_documento = self.tipoDocumento.currentText()
+        valor_compra = parse_float(self.valorCompra.text())
+
+        # Obter data da venda do DateLineEdit
+        data_venda_qdate = self.dataVenda.date()
+        data_venda = data_venda_qdate.toString("yyyy-MM-dd") if data_venda_qdate.isValid() else None
+
+        doc_venda = self.docVenda.text().strip()  # Manter como string
+        valor_venda = parse_float(self.valorVenda.text())
+
+        # Imposto é calculado, não lido diretamente
+        imposto = parse_float(self.imposto.text())
+        valor_base = parse_float(self.valorBase.text())
+
+        taxa_str = self.taxa.currentText()
+        taxa = parse_float(taxa_str) if taxa_str != "N/A" else None
+
+        regime_fiscal = ""
+        if self.regime_geral_radio.isChecked():
+            regime_fiscal = "Regime Normal"
+        elif self.regime_lucro_tributavel_radio.isChecked():
+            regime_fiscal = "Margem"
+
+        return {
+            "matricula": matricula,
+            "marca": marca,
+            "numeroQuadro": numero_quadro,
+            "isv": isv,
+            "nRegistoContabilidade": n_registo_contabilidade,
+            "dataCompra": data_compra,
+            "docCompra": doc_compra,
+            "tipoDocumento": tipo_documento,
+            "valorCompra": valor_compra,
+            "dataVenda": data_venda,
+            "docVenda": doc_venda,
+            "valorVenda": valor_venda,
+            "imposto": imposto,
+            "valorBase": valor_base,
+            "taxa": taxa,
+            "regime_fiscal": regime_fiscal
+        }
+
+    def add_record(self):
+        data = self.get_form_data()
+
+        # Validação básica
+        if not all([data["matricula"], data["marca"], data["valorCompra"] is not None]):
+            QMessageBox.warning(self, "Campos Obrigatórios",
+                                "Matrícula, Marca e Valor de Compra são obrigatórios.")
+            return
+
+        if self.mode == "add":
+            if add_expense_to_db(data["matricula"], data["marca"], data["numeroQuadro"], data["isv"],
+                                 data["nRegistoContabilidade"], data["dataCompra"], data["docCompra"],
+                                 data["tipoDocumento"], data["valorCompra"], data["dataVenda"],
+                                 data["docVenda"], data["valorVenda"], data["imposto"],
+                                 data["valorBase"], data["taxa"], data["regime_fiscal"]):
+                QMessageBox.information(self, "Sucesso", "Registo adicionado com sucesso!")
+                self.parent_window.load_table_data()
+                self.accept()
+            else:
+                QMessageBox.critical(self, "Erro", "Erro ao adicionar registo.")
+        elif self.mode == "edit":
+            if self.initial_data and self.initial_data.get("id") is not None:
+                if update_expense_in_db(self.initial_data["id"], data):
+                    QMessageBox.information(self, "Sucesso", "Registo atualizado com sucesso!")
+                    self.parent_window.load_table_data()
+                    self.accept()
+                else:
+                    QMessageBox.critical(self, "Erro", "Erro ao atualizar registo.")
+            else:
+                QMessageBox.critical(self, "Erro", "ID do veículo não encontrado para edição.")
+
+    def update_regime_button_states(self):
+        """Atualiza o estado (enabled/disabled) dos radio buttons do regime fiscal
+        e reinicia a seleção se as condições não forem cumpridas."""
+
+        valor_compra_text = self.valorCompra.text().strip().replace(',', '.')
+        valor_venda_text = self.valorVenda.text().strip().replace(',', '.')
+        taxa_selecionada = self.taxa.currentText()
+
+        try:
+            valor_compra = float(valor_compra_text) if valor_compra_text else 0.0
+            valor_venda = float(valor_venda_text) if valor_venda_text else 0.0
+        except ValueError:
+            valor_compra = 0.0
+            valor_venda = 0.0
+
+        # Condição para habilitar Regime Geral (Normal)
+        # Valor de venda preenchido E valor de compra preenchido E taxa selecionada diferente de "N/A"
+        enable_regime_geral = (
+                valor_compra > 0 and
+                valor_venda > 0 and
+                taxa_selecionada != "N/A"
+        )
+
+        # Condição para habilitar Margem
+        # Valor de venda preenchido E valor de compra preenchido E taxa selecionada diferente de "N/A"
+        # E (Valor Venda - Valor Compra) > 0
+        enable_regime_lucro = (
+                enable_regime_geral and
+                (valor_venda - valor_compra) > 0
+        )
+
+        # Aplicar estados
+        self.regime_geral_radio.setEnabled(enable_regime_geral)
+        self.regime_lucro_tributavel_radio.setEnabled(enable_regime_lucro)
+
+        # Lógica para redefinir seleção se as condições não forem mais válidas
+        # Se um regime estava selecionado e agora está desabilitado, desmarca-o
+        if self.regime_geral_radio.isChecked() and not enable_regime_geral:
+            self.regime_geral_radio.setChecked(False)
+            self.last_valid_regime_radio = None  # Reset do último regime válido
+            print("[DEBUG - AddExpenseDialog] Regime Normal desmarcado (condições não cumpridas).")
+
+        if self.regime_lucro_tributavel_radio.isChecked() and not enable_regime_lucro:
+            self.regime_lucro_tributavel_radio.setChecked(False)
+            self.last_valid_regime_radio = None  # Reset do último regime válido
+            print("[DEBUG - AddExpenseDialog] Regime Margem desmarcado (condições não cumpridas).")
+
+        # Se nenhum regime estiver selecionado e um for agora habilitado, e havia um último válido, seleciona-o
+        if not self.regime_geral_radio.isChecked() and not self.regime_lucro_tributavel_radio.isChecked():
+            if self.last_valid_regime_radio:
+                if self.last_valid_regime_radio == self.regime_geral_radio and enable_regime_geral:
+                    self.regime_geral_radio.setChecked(True)
+                    print("[DEBUG - AddExpenseDialog] Restaurado Regime Normal (último válido).")
+                elif self.last_valid_regime_radio == self.regime_lucro_tributavel_radio and enable_regime_lucro:
+                    self.regime_lucro_tributavel_radio.setChecked(True)
+                    print("[DEBUG - AddExpenseDialog] Restaurado Regime Margem (último válido).")
+            # Se não havia um último regime válido, ou ele não pode ser restaurado, não fazemos nada,
+            # deixando o utilizador escolher.
+
+        self.calculate_regime_fields()  # Recalcula após mudança de estado/seleção
+
+    def handle_regime_selection(self):
+        """Atualiza o 'last_valid_regime_radio' quando o utilizador faz uma seleção."""
+        if self.regime_geral_radio.isChecked():
+            self.last_valid_regime_radio = self.regime_geral_radio
+            print("[DEBUG - AddExpenseDialog] last_valid_regime_radio definido para Regime Normal.")
+        elif self.regime_lucro_tributavel_radio.isChecked():
+            self.last_valid_regime_radio = self.regime_lucro_tributavel_radio
+            print("[DEBUG - AddExpenseDialog] last_valid_regime_radio definido para Margem.")
+        else:
+            self.last_valid_regime_radio = None
+            print("[DEBUG - AddExpenseDialog] Nenhum regime selecionado, last_valid_regime_radio redefinido.")
+        self.calculate_regime_fields()  # Recalcula após a seleção do utilizador
+
+    def calculate_regime_fields(self):
+        """Calcula o Valor Base e o Imposto com base nas novas regras."""
+        valor_compra_text = self.valorCompra.text().strip().replace(',', '.')
+        valor_venda_text = self.valorVenda.text().strip().replace(',', '.')
+        taxa_str = self.taxa.currentText()
+
+        try:
+            valor_compra = Decimal(valor_compra_text) if valor_compra_text else Decimal(0)
+            valor_venda = Decimal(valor_venda_text) if valor_venda_text else Decimal(0)
+            taxa = Decimal(taxa_str) if taxa_str != "N/A" else Decimal(0)
+        except Exception:
+            # Se a conversão falhar, limpa os campos de cálculo e sai
+            self.valorBase.setText("")
+            self.imposto.setText("")
+            return
+
+        valor_base = Decimal(0)
+        imposto = Decimal(0)
+
+        # NOVO: Esta função agora usa QLocale para formatação localizada (pontos de milhar, vírgula decimal)
+        def format_decimal_for_display(value):
+            locale = QLocale(QLocale.Language.Portuguese, QLocale.Country.Portugal)
+            # Define o comportamento de arredondamento para sempre ter duas casas decimais
+            return locale.toString(float(value.quantize(Decimal("0.01"))), 'f', 2)
+
+        if self.regime_geral_radio.isChecked():
+            # Regime Normal: valor base = valor venda, imposto = valor venda * (taxa / 100)
+            valor_base = valor_venda
+            imposto = valor_venda * (taxa / Decimal(100))
+            print(f"[DEBUG - Calc] Regime Normal - Venda: {valor_venda}, Taxa: {taxa}, Imposto: {imposto}")
+        elif self.regime_lucro_tributavel_radio.isChecked():
+            # Regime da Margem: valor base = valor venda - valor compra, imposto = valor base * (taxa / 100)
+            margem = valor_venda - valor_compra
+            if margem > 0:
+                valor_base = margem
+                imposto = margem * (taxa / Decimal(100))
+            else:
+                # Se a margem for <= 0, não há imposto neste regime
+                valor_base = Decimal(0)
+                imposto = Decimal(0)
+            print(
+                f"[DEBUG - Calc] Regime Margem - Venda: {valor_venda}, Compra: {valor_compra}, Margem: {margem}, Taxa: {taxa}, Imposto: {imposto}")
+        else:
+            # Se nenhum regime estiver selecionado, os campos ficam vazios
+            self.valorBase.setText("")
+            self.imposto.setText("")
+            return  # Sai da função, pois não há cálculo a fazer
+
+        # Arredondar para duas casas decimais
+        valor_base = valor_base.quantize(Decimal("0.01"))
+        imposto = imposto.quantize(Decimal("0.01"))
+
+        self.valorBase.setText(format_decimal_for_display(valor_base))
+        self.imposto.setText(format_decimal_for_display(imposto))
+
+
+class ExpenseApp(QWidget):
+    def __init__(self):
+        super().__init__()
+        self.init_ui()
+        self.apply_styles()
+        self.load_table_data()
+        self.showMaximized()  # Definir para iniciar em tela cheia
+
+    def init_ui(self):
+        self.setWindowTitle("MBAuto - Gestão de Despesas de Viaturas")
+        # Removido self.setGeometry, pois showMaximized() o substituirá
+        # self.setGeometry(100, 100, 1000, 600)  # Maior para acomodar as colunas
+
+        self.table = QTableWidget()
+        self.table.setColumnCount(7)  # ID, Matrícula, Marca, Valor Compra, Doc Venda, Valor Venda, Imposto
+        self.table.setHorizontalHeaderLabels(
+            ["ID", "Matrícula", "Marca", "Valor Compra", "Doc. Venda", "Valor Venda", "Imposto"])
+        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)  # Make table non-editable
+        self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)  # Selects entire row
+
+        # --- CONECTAR O SINAL DE DUPLO CLIQUE ---
+        self.table.doubleClicked.connect(self.show_edit_dialog)
+
+        # Hide the ID column
+        self.table.setColumnHidden(0, True)
+
+        self.add_button = QPushButton("Adicionar Registo")
+        self.delete_button = QPushButton("Apagar Registo")
+        self.search_input = QLineEdit()
+        self.search_input.setPlaceholderText("Pesquisar por Matrícula ou Marca...")
+
+        # Conectar o sinal returnPressed para pesquisar ao pressionar Enter
+        self.search_input.returnPressed.connect(self.search_expenses)
+
+        # Botão de limpar pesquisa (X)
+        self.clear_search_button = QPushButton("X")
+        self.clear_search_button.setObjectName("clearSearchButton")  # Para aplicar estilo CSS específico
+        self.clear_search_button.setToolTip("Limpar pesquisa e mostrar todos os registos")
+        self.clear_search_button.clicked.connect(self.clear_search)
+
+        # Botão de pesquisa (Lupa)
+        self.search_button = QPushButton("🔍")  # Ícone de lupa (Unicode)
+        self.search_button.setObjectName("searchButton")  # Para aplicar estilo CSS específico
+        self.search_button.setToolTip("Pesquisar registos")
+        self.search_button.clicked.connect(self.search_expenses)
+
+        # Layouts
+        button_layout = QHBoxLayout()
+        button_layout.addWidget(self.add_button)
+        button_layout.addWidget(self.delete_button)
+        button_layout.addStretch(1)  # Push buttons to the left
+
+        search_layout = QHBoxLayout()
+        search_layout.addWidget(self.search_input)
+        search_layout.addWidget(self.clear_search_button)  # X antes da lupa
+        search_layout.addWidget(self.search_button)  # Botão de pesquisa (Lupa)
+
+        self.add_button.clicked.connect(self.show_add_dialog)
+        self.delete_button.clicked.connect(self.delete_expense)
+        # self.search_button.clicked.connect(self.search_expenses) # Conectado acima
+
+        main_layout = QVBoxLayout()
+        main_layout.addLayout(button_layout)
+        main_layout.addLayout(search_layout)
+        main_layout.addWidget(self.table)
+
+        self.setLayout(main_layout)
+
+    def apply_styles(self):
+        self.setStyleSheet("""
+    /* Base styling */
+    QWidget {
+        background-color: #e3e9f2;
+        font-family: Arial, sans-serif;
+        font-size: 14px;
+        color: #333;
+    }
+
+    /* Headings for labels */
+    QLabel {
+        font-size: 16px;
+        color: #2c3e50;
+        font-weight: bold;
+        padding: 5px;
+    }
+
+    /* Styling for input fields */
+    QLineEdit, QComboBox {
+        background-color: #ffffff;
+        font-size: 14px;
+        color: #333;
+        border: 1px solid #b0bfc6;
+        border-radius: 5px;
+        padding: 5px;
+    }
+    QLineEdit:hover, QComboBox:hover {
+        border: 1px solid #4caf50;
+    }
+    QLineEdit:focus, QComboBox:focus {
+        border: 1px solid #2a9d8f;
+        background-color: #f5f9fc;
+    }
+
+    /* Table styling */
+    QTableWidget {
+        background-color: #ffffff;
+        alternate-background-color: #f2f7fb;
+        gridline-color: #c0c9d0;
+        font-size: 14px;
+        border: 1px solid #cfd9e1;
+    }
+
+    /* A COR DE SELEÇÃO DEVE SER MAIS ESPECÍFICA PARA SOBREPÔR OUTRAS CORES */
+    QTableWidget::item:selected {
+        background-color: #d0d7de; /* Cor de seleção cinza mais clara */
+        color: #000000;
+    }
+
+    /* NOVO: Estilo para itens vendidos - será sobreposto por ::item:selected */
+    /* Este estilo aplica-se ao item individual, o que pode ser mais robusto */
+    QTableWidget::item[sold="true"] { /* Usamos uma propriedade dinâmica 'sold' */
+        background-color: #d4edda; /* Verde pastel para vendido */
+        color: #333; /* Cor do texto para contraste */
+    }
+
+
+    QHeaderView::section {
+        background-color: #4caf50;
+        color: white;
+        font-weight: bold;
+        padding: 4px;
+        border: 1px solid #cfd9e1;
+    }
+
+    /* Scroll bar styling */
+    QScrollBar:vertical {
+        width: 12px;
+        background-color: #f0f0f0;
+        border: none;
+    }
+    QScrollBar::handle:vertical {
+        background-color: #4caf50;
+        min-height: 20px;
+        border-radius: 5px;
+    }
+    QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+        background: none;
+    }
+
+    /* Buttons */
+    QPushButton {
+        background-color: #4caf50;
+        color: white;
+        padding: 10px 15px;
+        border-radius: 5px;
+        font-size: 14px;
+        font-weight: bold;
+        transition: background-color 0.3s;
+    }
+    QPushButton:hover {
+        background-color: #45a049;
+    }
+    QPushButton:pressed {
+        background-color: #3d8b40;
+    }
+    QPushButton:disabled {
+        background-color: #c8c8c8;
+        color: #6e6e6e;
+    }
+
+    /* Estilo para o botão de Limpar Pesquisa (o "X") */
+    QPushButton#clearSearchButton {
+        background-color: transparent;
+        border: none;
+        color: #555555;
+        padding: 0px 5px;
+        border-radius: 5px;
+        font-size: 18px;
+        font-weight: bold;
+        min-width: 25px;
+    }
+    QPushButton#clearSearchButton:hover {
+        background-color: #e0e0e0;
+        border-radius: 5px;
+    }
+    QPushButton#clearSearchButton:pressed {
+        background-color: #cccccc;
+    }
+
+    /* NOVO: Estilo para o botão de Pesquisa (a "Lupa") */
+    QPushButton#searchButton {
+        background-color: transparent;
+        border: none;
+        color: #555555;
+        padding: 0px 5px;
+        border-radius: 5px;
+        font-size: 18px;
+        font-weight: bold;
+        min-width: 25px;
+    }
+    QPushButton#searchButton:hover {
+        background-color: #e0e0e0;
+        border-radius: 5px;
+    }
+    QPushButton#searchButton:pressed {
+        background-color: #cccccc;
+    }
+
+
+    /* Tooltip styling */
+    QToolTip {
+        background-color: #2c3e50;
+        color: #ffffff;
+        border: 1px solid #333;
+        font-size: 12px;
+        padding: 5px;
+        border-radius: 4px;
+    }
+
+    /* ESTILO PARA QRadioButton */
+    QRadioButton {
+        color: #333;
+        padding: 4px 0px;
+    }
+
+    QRadioButton::indicator {
+        width: 16px;
+        height: 16px;
+        border-radius: 8px;
+        border: 2px solid #555555;
+        background-color: #ffffff;
+    }
+
+    QRadioButton::indicator:hover {
+        border: 2px solid #4caf50;
+    }
+
+    QRadioButton::indicator:checked {
+        background-color: #4caf50;
+        border: 2px solid #2a9d8f;
+    }
+
+    /* NOVO ESTILO: QRadioButton quando desabilitado */
+    QRadioButton:disabled {
+        color: #a0a0a0;
+    }
+
+    QRadioButton::indicator:disabled {
+        background-color: #e0e0e0;
+        border: 2px solid #b0b0b0;
+    }
+
+    /* Estilo para QCalendarWidget */
+    QCalendarWidget {
+        background-color: #ffffff;
+        border: 1px solid #cfd9e1;
+        border-radius: 5px;
+    }
+
+    /* Barra de navegação do calendário (onde está o mês e ano) */
+    QCalendarWidget QWidget#qt_calendar_navigationbar {
+        background-color: #e8ecf4;
+        color: #333;
+        border-top-left-radius: 5px;
+        border-top-right-radius: 5px;
+        border: none;
+    }
+
+    /* Estilo dos botões de navegação (setas) e spinbox de ano/mês */
+    QCalendarWidget QAbstractSpinBox,
+    QCalendarWidget QPushButton {
+        background-color: #e8ecf4;
+        color: #4caf50;
+        border: 1px solid #b0bfc6;
+        border-radius: 3px;
+        font-size: 14px;
+        padding: 3px 5px;
+    }
+    QCalendarWidget QAbstractSpinBox:hover,
+    QCalendarWidget QPushButton:hover {
+        background-color: #dbe2ea;
+    }
+    QCalendarWidget QAbstractSpinBox:pressed,
+    QCalendarWidget QPushButton:pressed {
+        background-color: #c9d0d9;
+    }
+
+    /* Setas dentro do Spinbox */
+    QCalendarWidget QSpinBox::up-button,
+    QCalendarWidget QSpinBox::down-button {
+        subcontrol-origin: border;
+        subcontrol-position: right;
+        width: 16px;
+        border-left: 1px solid #b0bfc6;
+        background-color: #e8ecf4;
+        border-top-right-radius: 3px;
+        border-bottom-right-radius: 3px;
+    }
+    QCalendarWidget QSpinBox::up-button:hover,
+    QCalendarWidget QSpinBox::down-button:hover {
+        background-color: #dbe2ea;
+    }
+    QCalendarWidget QSpinBox::up-arrow,
+    QCalendarWidget QSpinBox::down-arrow {
+        background-color: transparent;
+        color: #4caf50;
+    }
+
+    /* Cabeçalho da grelha do calendário (Dias da Semana - Seg, Ter, Qua, etc.) */
+    QCalendarWidget QAbstractItemView {
+        background-color: #ffffff;
+        selection-background-color: #a0d4a3;
+        selection-color: #000000;
+        outline: none;
+        border-bottom: 1px solid #e0e0e0;
+    }
+
+    QCalendarWidget QAbstractItemView QHeaderView::section {
+        background-color: #f0f0f0;
+        color: #555555;
+        border: none;
+        padding: 5px;
+    }
+
+    /* Estilo para o dia normal no calendário */
+    QCalendarWidget QAbstractItemView:enabled {
+        color: #333;
+    }
+
+    QCalendarWidget QAbstractItemView:enabled:hover {
+        background-color: #e6ffe6;
+        border-radius: 3px;
+    }
+
+    QCalendarWidget QAbstractItemView:selected {
+        background-color: #2a9d8f;
+        color: white;
+        border-radius: 3px;
+    }
+
+    /* Para o dia de hoje - AGORA COM CIRCULO VERDE MAIS CLARO */
+    QCalendarWidget QAbstractItemView:!selected:focus {
+        background-color: #d4f7d4;
+        color: #000000;
+        border: 1px solid #4caf50;
+        border-radius: 50%;
+    }
+
+    /* Para a borda à volta do número do dia */
+    QCalendarWidget QCalendarView::item {
+        border-radius: 0px;
+        padding: 4px;
+    }
+
+    /* Dias desabilitados (fora do mês atual) */
+    QCalendarWidget QAbstractItemView:disabled {
+        color: #cccccc;
+    }
+""")
+
+    def get_form_data(self):
+        # Esta função já estava completa e não precisa de alterações relacionadas a "vendido"
+        matricula = self.matricula.text().strip()
+        marca = self.marca.text().strip()
+        numero_quadro = self.numeroQuadro.text().strip()
+
+        # Funções para conversão segura de campos numéricos
+        def parse_float(text):
+            locale = QLocale(QLocale.Language.Portuguese, QLocale.Country.Portugal)
+            try:
+                # Remove espaços em branco
+                clean_text = text.strip()
+                if not clean_text:  # Se for string vazia após strip, retorna None
+                    return None
+                # Converte para float usando a localidade correta para vírgula/ponto decimal
+                return locale.toFloat(clean_text)[0]  # [0] para obter o float do tuple (float, bool)
+            except Exception as e:
+                print(f"Erro ao converter '{text}' para float: {e}")
+                return None
+
+        def parse_int(text):
+            try:
+                # Remove espaços em branco
+                clean_text = text.strip()
+                if not clean_text:  # Se for string vazia após strip, retorna None
+                    return None
+                return int(clean_text)
+            except ValueError:
+                return None
+
+        isv = parse_float(self.isv.text())
+        n_registo_contabilidade = self.nRegistoContabilidade.text().strip()  # Manter como string
+
+        # Obter data da compra do DateLineEdit
+        data_compra_qdate = self.dataCompra.date()
+        data_compra = data_compra_qdate.toString("yyyy-MM-dd") if data_compra_qdate.isValid() else None
+
+        doc_compra = self.docCompra.text().strip()
+        tipo_documento = self.tipoDocumento.currentText()
+        valor_compra = parse_float(self.valorCompra.text())
+
+        # Obter data da venda do DateLineEdit
+        data_venda_qdate = self.dataVenda.date()
+        data_venda = data_venda_qdate.toString("yyyy-MM-dd") if data_venda_qdate.isValid() else None
+
+        doc_venda = self.docVenda.text().strip()  # Manter como string
+        valor_venda = parse_float(self.valorVenda.text())
+
+        # Imposto é calculado, não lido diretamente
+        imposto = parse_float(self.imposto.text())
+        valor_base = parse_float(self.valorBase.text())
+
+        taxa_str = self.taxa.currentText()
+        taxa = parse_float(taxa_str) if taxa_str != "N/A" else None
+
+        regime_fiscal = ""
+        if self.regime_geral_radio.isChecked():
+            regime_fiscal = "Regime Normal"
+        elif self.regime_lucro_tributavel_radio.isChecked():
+            regime_fiscal = "Margem"
+
+        return {
+            "matricula": matricula,
+            "marca": marca,
+            "numeroQuadro": numero_quadro,
+            "isv": isv,
+            "nRegistoContabilidade": n_registo_contabilidade,
+            "dataCompra": data_compra,
+            "docCompra": doc_compra,
+            "tipoDocumento": tipo_documento,
+            "valorCompra": valor_compra,
+            "dataVenda": data_venda,
+            "docVenda": doc_venda,
+            "valorVenda": valor_venda,
+            "imposto": imposto,
+            "valorBase": valor_base,
+            "taxa": taxa,
+            "regime_fiscal": regime_fiscal
+        }
+
+    def add_record(self):
+        data = self.get_form_data()
+
+        # Validação básica
+        if not all([data["matricula"], data["marca"], data["valorCompra"] is not None]):
+            QMessageBox.warning(self, "Campos Obrigatórios",
+                                "Matrícula, Marca e Valor de Compra são obrigatórios.")
+            return
+
+        if self.mode == "add":
+            if add_expense_to_db(data["matricula"], data["marca"], data["numeroQuadro"], data["isv"],
+                                 data["nRegistoContabilidade"], data["dataCompra"], data["docCompra"],
+                                 data["tipoDocumento"], data["valorCompra"], data["dataVenda"],
+                                 data["docVenda"], data["valorVenda"], data["imposto"],
+                                 data["valorBase"], data["taxa"], data["regime_fiscal"]):
+                QMessageBox.information(self, "Sucesso", "Registo adicionado com sucesso!")
+                self.parent_window.load_table_data()
+                self.accept()
+            else:
+                QMessageBox.critical(self, "Erro", "Erro ao adicionar registo.")
+        elif self.mode == "edit":
+            if self.initial_data and self.initial_data.get("id") is not None:
+                if update_expense_in_db(self.initial_data["id"], data):
+                    QMessageBox.information(self, "Sucesso", "Registo atualizado com sucesso!")
+                    self.parent_window.load_table_data()
+                    self.accept()
+                else:
+                    QMessageBox.critical(self, "Erro", "Erro ao atualizar registo.")
+            else:
+                QMessageBox.critical(self, "Erro", "ID do veículo não encontrado para edição.")
+
+    def update_regime_button_states(self):
+        """Atualiza o estado (enabled/disabled) dos radio buttons do regime fiscal
+        e reinicia a seleção se as condições não forem cumpridas."""
+
+        valor_compra_text = self.valorCompra.text().strip().replace(',', '.')
+        valor_venda_text = self.valorVenda.text().strip().replace(',', '.')
+        taxa_selecionada = self.taxa.currentText()
+
+        try:
+            valor_compra = float(valor_compra_text) if valor_compra_text else 0.0
+            valor_venda = float(valor_venda_text) if valor_venda_text else 0.0
+        except ValueError:
+            valor_compra = 0.0
+            valor_venda = 0.0
+
+        # Condição para habilitar Regime Geral (Normal)
+        # Valor de venda preenchido E valor de compra preenchido E taxa selecionada diferente de "N/A"
+        enable_regime_geral = (
+                valor_compra > 0 and
+                valor_venda > 0 and
+                taxa_selecionada != "N/A"
+        )
+
+        # Condição para habilitar Margem
+        # Valor de venda preenchido E valor de compra preenchido E taxa selecionada diferente de "N/A"
+        # E (Valor Venda - Valor Compra) > 0
+        enable_regime_lucro = (
+                enable_regime_geral and
+                (valor_venda - valor_compra) > 0
+        )
+
+        # Aplicar estados
+        self.regime_geral_radio.setEnabled(enable_regime_geral)
+        self.regime_lucro_tributavel_radio.setEnabled(enable_regime_lucro)
+
+        # Lógica para redefinir seleção se as condições não forem mais válidas
+        # Se um regime estava selecionado e agora está desabilitado, desmarca-o
+        if self.regime_geral_radio.isChecked() and not enable_regime_geral:
+            self.regime_geral_radio.setChecked(False)
+            self.last_valid_regime_radio = None  # Reset do último regime válido
+            print("[DEBUG - AddExpenseDialog] Regime Normal desmarcado (condições não cumpridas).")
+
+        if self.regime_lucro_tributavel_radio.isChecked() and not enable_regime_lucro:
+            self.regime_lucro_tributavel_radio.setChecked(False)
+            self.last_valid_regime_radio = None  # Reset do último regime válido
+            print("[DEBUG - AddExpenseDialog] Regime Margem desmarcado (condições não cumpridas).")
+
+        # Se nenhum regime estiver selecionado e um for agora habilitado, e havia um último válido, seleciona-o
+        if not self.regime_geral_radio.isChecked() and not self.regime_lucro_tributavel_radio.isChecked():
+            if self.last_valid_regime_radio:
+                if self.last_valid_regime_radio == self.regime_geral_radio and enable_regime_geral:
+                    self.regime_geral_radio.setChecked(True)
+                    print("[DEBUG - AddExpenseDialog] Restaurado Regime Normal (último válido).")
+                elif self.last_valid_regime_radio == self.regime_lucro_tributavel_radio and enable_regime_lucro:
+                    self.regime_lucro_tributavel_radio.setChecked(True)
+                    print("[DEBUG - AddExpenseDialog] Restaurado Regime Margem (último válido).")
+            # Se não havia um último regime válido, ou ele não pode ser restaurado, não fazemos nada,
+            # deixando o utilizador escolher.
+
+        self.calculate_regime_fields()  # Recalcula após mudança de estado/seleção
+
+    def handle_regime_selection(self):
+        """Atualiza o 'last_valid_regime_radio' quando o utilizador faz uma seleção."""
+        if self.regime_geral_radio.isChecked():
+            self.last_valid_regime_radio = self.regime_geral_radio
+            print("[DEBUG - AddExpenseDialog] last_valid_regime_radio definido para Regime Normal.")
+        elif self.regime_lucro_tributavel_radio.isChecked():
+            self.last_valid_regime_radio = self.regime_lucro_tributavel_radio
+            print("[DEBUG - AddExpenseDialog] last_valid_regime_radio definido para Margem.")
+        else:
+            self.last_valid_regime_radio = None
+            print("[DEBUG - AddExpenseDialog] Nenhum regime selecionado, last_valid_regime_radio redefinido.")
+        self.calculate_regime_fields()  # Recalcula após a seleção do utilizador
+
+    def calculate_regime_fields(self):
+        """Calcula o Valor Base e o Imposto com base nas novas regras."""
+        valor_compra_text = self.valorCompra.text().strip().replace(',', '.')
+        valor_venda_text = self.valorVenda.text().strip().replace(',', '.')
+        taxa_str = self.taxa.currentText()
+
+        try:
+            valor_compra = Decimal(valor_compra_text) if valor_compra_text else Decimal(0)
+            valor_venda = Decimal(valor_venda_text) if valor_venda_text else Decimal(0)
+            taxa = Decimal(taxa_str) if taxa_str != "N/A" else Decimal(0)
+        except Exception:
+            # Se a conversão falhar, limpa os campos de cálculo e sai
+            self.valorBase.setText("")
+            self.imposto.setText("")
+            return
+
+        valor_base = Decimal(0)
+        imposto = Decimal(0)
+
+        # NOVO: Esta função agora usa QLocale para formatação localizada (pontos de milhar, vírgula decimal)
+        def format_decimal_for_display(value):
+            locale = QLocale(QLocale.Language.Portuguese, QLocale.Country.Portugal)
+            # Define o comportamento de arredondamento para sempre ter duas casas decimais
+            return locale.toString(float(value.quantize(Decimal("0.01"))), 'f', 2)
+
+        if self.regime_geral_radio.isChecked():
+            # Regime Normal: valor base = valor venda, imposto = valor venda * (taxa / 100)
+            valor_base = valor_venda
+            imposto = valor_venda * (taxa / Decimal(100))
+            print(f"[DEBUG - Calc] Regime Normal - Venda: {valor_venda}, Taxa: {taxa}, Imposto: {imposto}")
+        elif self.regime_lucro_tributavel_radio.isChecked():
+            # Regime da Margem: valor base = valor venda - valor compra, imposto = valor base * (taxa / 100)
+            margem = valor_venda - valor_compra
+            if margem > 0:
+                valor_base = margem
+                imposto = margem * (taxa / Decimal(100))
+            else:
+                # Se a margem for <= 0, não há imposto neste regime
+                valor_base = Decimal(0)
+                imposto = Decimal(0)
+            print(
+                f"[DEBUG - Calc] Regime Margem - Venda: {valor_venda}, Compra: {valor_compra}, Margem: {margem}, Taxa: {taxa}, Imposto: {imposto}")
+        else:
+            # Se nenhum regime estiver selecionado, os campos ficam vazios
+            self.valorBase.setText("")
+            self.imposto.setText("")
+            return  # Sai da função, pois não há cálculo a fazer
+
+        # Arredondar para duas casas decimais
+        valor_base = valor_base.quantize(Decimal("0.01"))
+        imposto = imposto.quantize(Decimal("0.01"))
+
+        self.valorBase.setText(format_decimal_for_display(valor_base))
+        self.imposto.setText(format_decimal_for_display(imposto))
+
+
+class ExpenseApp(QWidget):
+    def __init__(self):
+        super().__init__()
+        self.init_ui()
+        self.apply_styles()
+        self.load_table_data()
+        self.showMaximized()  # Definir para iniciar em tela cheia
+
+    def init_ui(self):
+        self.setWindowTitle("MBAuto - Gestão de Despesas de Viaturas")
+        # Removido self.setGeometry, pois showMaximized() o substituirá
+        # self.setGeometry(100, 100, 1000, 600)  # Maior para acomodar as colunas
+
+        self.table = QTableWidget()
+        self.table.setColumnCount(7)  # ID, Matrícula, Marca, Valor Compra, Doc Venda, Valor Venda, Imposto
+        self.table.setHorizontalHeaderLabels(
+            ["ID", "Matrícula", "Marca", "Valor Compra", "Doc. Venda", "Valor Venda", "Imposto"])
+        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)  # Make table non-editable
+        self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)  # Selects entire row
+
+        # --- CONECTAR O SINAL DE DUPLO CLIQUE ---
+        self.table.doubleClicked.connect(self.show_edit_dialog)
+
+        # Hide the ID column
+        self.table.setColumnHidden(0, True)
+
+        self.add_button = QPushButton("Adicionar Registo")
+        self.delete_button = QPushButton("Apagar Registo")
+        self.search_input = QLineEdit()
+        self.search_input.setPlaceholderText("Pesquisar por Matrícula ou Marca...")
+
+        # Conectar o sinal returnPressed para pesquisar ao pressionar Enter
+        self.search_input.returnPressed.connect(self.search_expenses)
+
+        # Botão de limpar pesquisa (X)
+        self.clear_search_button = QPushButton("X")
+        self.clear_search_button.setObjectName("clearSearchButton")  # Para aplicar estilo CSS específico
+        self.clear_search_button.setToolTip("Limpar pesquisa e mostrar todos os registos")
+        self.clear_search_button.clicked.connect(self.clear_search)
+
+        # Botão de pesquisa (Lupa)
+        self.search_button = QPushButton("🔍")  # Ícone de lupa (Unicode)
+        self.search_button.setObjectName("searchButton")  # Para aplicar estilo CSS específico
+        self.search_button.setToolTip("Pesquisar registos")
+        self.search_button.clicked.connect(self.search_expenses)
+
+        # Layouts
+        button_layout = QHBoxLayout()
+        button_layout.addWidget(self.add_button)
+        button_layout.addWidget(self.delete_button)
+        button_layout.addStretch(1)  # Push buttons to the left
+
+        search_layout = QHBoxLayout()
+        search_layout.addWidget(self.search_input)
+        search_layout.addWidget(self.clear_search_button)  # X antes da lupa
+        search_layout.addWidget(self.search_button)  # Botão de pesquisa (Lupa)
+
+        self.add_button.clicked.connect(self.show_add_dialog)
+        self.delete_button.clicked.connect(self.delete_expense)
+        # self.search_button.clicked.connect(self.search_expenses) # Conectado acima
+
+        main_layout = QVBoxLayout()
+        main_layout.addLayout(button_layout)
+        main_layout.addLayout(search_layout)
+        main_layout.addWidget(self.table)
+
+        self.setLayout(main_layout)
+
+    def apply_styles(self):
+        self.setStyleSheet("""
+    /* Base styling */
+    QWidget {
+        background-color: #e3e9f2;
+        font-family: Arial, sans-serif;
+        font-size: 14px;
+        color: #333;
+    }
+
+    /* Headings for labels */
+    QLabel {
+        font-size: 16px;
+        color: #2c3e50;
+        font-weight: bold;
+        padding: 5px;
+    }
+
+    /* Styling for input fields */
+    QLineEdit, QComboBox {
+        background-color: #ffffff;
+        font-size: 14px;
+        color: #333;
+        border: 1px solid #b0bfc6;
+        border-radius: 5px;
+        padding: 5px;
+    }
+    QLineEdit:hover, QComboBox:hover {
+        border: 1px solid #4caf50;
+    }
+    QLineEdit:focus, QComboBox:focus {
+        border: 1px solid #2a9d8f;
+        background-color: #f5f9fc;
+    }
+
+    /* Table styling */
+    QTableWidget {
+        background-color: #ffffff;
+        alternate-background-color: #f2f7fb;
+        gridline-color: #c0c9d0;
+        font-size: 14px;
+        border: 1px solid #cfd9e1;
+    }
+
+    /* A COR DE SELEÇÃO DEVE SER MAIS ESPECÍFICA PARA SOBREPÔR OUTRAS CORES */
+    QTableWidget::item:selected {
+        background-color: #d0d7de; /* Cor de seleção cinza mais clara */
+        color: #000000;
+    }
+
+    /* NOVO: Estilo para itens vendidos - será sobreposto por ::item:selected */
+    /* Este estilo aplica-se ao item individual, o que pode ser mais robusto */
+    QTableWidget::item[sold="true"] { /* Usamos uma propriedade dinâmica 'sold' */
+        background-color: #d4edda; /* Verde pastel para vendido */
+        color: #333; /* Cor do texto para contraste */
+    }
+
+
+    QHeaderView::section {
+        background-color: #4caf50;
+        color: white;
+        font-weight: bold;
+        padding: 4px;
+        border: 1px solid #cfd9e1;
+    }
+
+    /* Scroll bar styling */
+    QScrollBar:vertical {
+        width: 12px;
+        background-color: #f0f0f0;
+        border: none;
+    }
+    QScrollBar::handle:vertical {
+        background-color: #4caf50;
+        min-height: 20px;
+        border-radius: 5px;
+    }
+    QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+        background: none;
+    }
+
+    /* Buttons */
+    QPushButton {
+        background-color: #4caf50;
+        color: white;
+        padding: 10px 15px;
+        border-radius: 5px;
+        font-size: 14px;
+        font-weight: bold;
+        transition: background-color 0.3s;
+    }
+    QPushButton:hover {
+        background-color: #45a049;
+    }
+    QPushButton:pressed {
+        background-color: #3d8b40;
+    }
+    QPushButton:disabled {
+        background-color: #c8c8c8;
+        color: #6e6e6e;
+    }
+
+    /* Estilo para o botão de Limpar Pesquisa (o "X") */
+    QPushButton#clearSearchButton {
+        background-color: transparent;
+        border: none;
+        color: #555555;
+        padding: 0px 5px;
+        border-radius: 5px;
+        font-size: 18px;
+        font-weight: bold;
+        min-width: 25px;
+    }
+    QPushButton#clearSearchButton:hover {
+        background-color: #e0e0e0;
+        border-radius: 5px;
+    }
+    QPushButton#clearSearchButton:pressed {
+        background-color: #cccccc;
+    }
+
+    /* NOVO: Estilo para o botão de Pesquisa (a "Lupa") */
+    QPushButton#searchButton {
+        background-color: transparent;
+        border: none;
+        color: #555555;
+        padding: 0px 5px;
+        border-radius: 5px;
+        font-size: 18px;
+        font-weight: bold;
+        min-width: 25px;
+    }
+    QPushButton#searchButton:hover {
+        background-color: #e0e0e0;
+        border-radius: 5px;
+    }
+    QPushButton#searchButton:pressed {
+        background-color: #cccccc;
+    }
+
+
+    /* Tooltip styling */
+    QToolTip {
+        background-color: #2c3e50;
+        color: #ffffff;
+        border: 1px solid #333;
+        font-size: 12px;
+        padding: 5px;
+        border-radius: 4px;
+    }
+
+    /* ESTILO PARA QRadioButton */
+    QRadioButton {
+        color: #333;
+        padding: 4px 0px;
+    }
+
+    QRadioButton::indicator {
+        width: 16px;
+        height: 16px;
+        border-radius: 8px;
+        border: 2px solid #555555;
+        background-color: #ffffff;
+    }
+
+    QRadioButton::indicator:hover {
+        border: 2px solid #4caf50;
+    }
+
+    QRadioButton::indicator:checked {
+        background-color: #4caf50;
+        border: 2px solid #2a9d8f;
+    }
+
+    /* NOVO ESTILO: QRadioButton quando desabilitado */
+    QRadioButton:disabled {
+        color: #a0a0a0;
+    }
+
+    QRadioButton::indicator:disabled {
+        background-color: #e0e0e0;
+        border: 2px solid #b0b0b0;
+    }
+
+    /* Estilo para QCalendarWidget */
+    QCalendarWidget {
+        background-color: #ffffff;
+        border: 1px solid #cfd9e1;
+        border-radius: 5px;
+    }
+
+    /* Barra de navegação do calendário (onde está o mês e ano) */
+    QCalendarWidget QWidget#qt_calendar_navigationbar {
+        background-color: #e8ecf4;
+        color: #333;
+        border-top-left-radius: 5px;
+        border-top-right-radius: 5px;
+        border: none;
+    }
+
+    /* Estilo dos botões de navegação (setas) e spinbox de ano/mês */
+    QCalendarWidget QAbstractSpinBox,
+    QCalendarWidget QPushButton {
+        background-color: #e8ecf4;
+        color: #4caf50;
+        border: 1px solid #b0bfc6;
+        border-radius: 3px;
+        font-size: 14px;
+        padding: 3px 5px;
+    }
+    QCalendarWidget QAbstractSpinBox:hover,
+    QCalendarWidget QPushButton:hover {
+        background-color: #dbe2ea;
+    }
+    QCalendarWidget QAbstractSpinBox:pressed,
+    QCalendarWidget QPushButton:pressed {
+        background-color: #c9d0d9;
+    }
+
+    /* Setas dentro do Spinbox */
+    QCalendarWidget QSpinBox::up-button,
+    QCalendarWidget QSpinBox::down-button {
+        subcontrol-origin: border;
+        subcontrol-position: right;
+        width: 16px;
+        border-left: 1px solid #b0bfc6;
+        background-color: #e8ecf4;
+        border-top-right-radius: 3px;
+        border-bottom-right-radius: 3px;
+    }
+    QCalendarWidget QSpinBox::up-button:hover,
+    QCalendarWidget QSpinBox::down-button:hover {
+        background-color: #dbe2ea;
+    }
+    QCalendarWidget QSpinBox::up-arrow,
+    QCalendarWidget QSpinBox::down-arrow {
+        background-color: transparent;
+        color: #4caf50;
+    }
+
+    /* Cabeçalho da grelha do calendário (Dias da Semana - Seg, Ter, Qua, etc.) */
+    QCalendarWidget QAbstractItemView {
+        background-color: #ffffff;
+        selection-background-color: #a0d4a3;
+        selection-color: #000000;
+        outline: none;
+        border-bottom: 1px solid #e0e0e0;
+    }
+
+    QCalendarWidget QAbstractItemView QHeaderView::section {
+        background-color: #f0f0f0;
+        color: #555555;
+        border: none;
+        padding: 5px;
+    }
+
+    /* Estilo para o dia normal no calendário */
+    QCalendarWidget QAbstractItemView:enabled {
+        color: #333;
+    }
+
+    QCalendarWidget QAbstractItemView:enabled:hover {
+        background-color: #e6ffe6;
+        border-radius: 3px;
+    }
+
+    QCalendarWidget QAbstractItemView:selected {
+        background-color: #2a9d8f;
+        color: white;
+        border-radius: 3px;
+    }
+
+    /* Para o dia de hoje - AGORA COM CIRCULO VERDE MAIS CLARO */
+    QCalendarWidget QAbstractItemView:!selected:focus {
+        background-color: #d4f7d4;
+        color: #000000;
+        border: 1px solid #4caf50;
+        border-radius: 50%;
+    }
+
+    /* Para a borda à volta do número do dia */
+    QCalendarWidget QCalendarView::item {
+        border-radius: 0px;
+        padding: 4px;
+    }
+
+    /* Dias desabilitados (fora do mês atual) */
+    QCalendarWidget QAbstractItemView:disabled {
+        color: #cccccc;
+    }
+""")
+
+    def get_form_data(self):
+        # Esta função já estava completa e não precisa de alterações relacionadas a "vendido"
+        matricula = self.matricula.text().strip()
+        marca = self.marca.text().strip()
+        numero_quadro = self.numeroQuadro.text().strip()
+
+        # Funções para conversão segura de campos numéricos
+        def parse_float(text):
+            locale = QLocale(QLocale.Language.Portuguese, QLocale.Country.Portugal)
+            try:
+                # Remove espaços em branco
+                clean_text = text.strip()
+                if not clean_text:  # Se for string vazia após strip, retorna None
+                    return None
+                # Converte para float usando a localidade correta para vírgula/ponto decimal
+                return locale.toFloat(clean_text)[0]  # [0] para obter o float do tuple (float, bool)
+            except Exception as e:
+                print(f"Erro ao converter '{text}' para float: {e}")
+                return None
+
+        def parse_int(text):
+            try:
+                # Remove espaços em branco
+                clean_text = text.strip()
+                if not clean_text:  # Se for string vazia após strip, retorna None
+                    return None
+                return int(clean_text)
+            except ValueError:
+                return None
+
+        isv = parse_float(self.isv.text())
+        n_registo_contabilidade = self.nRegistoContabilidade.text().strip()  # Manter como string
+
+        # Obter data da compra do DateLineEdit
+        data_compra_qdate = self.dataCompra.date()
+        data_compra = data_compra_qdate.toString("yyyy-MM-dd") if data_compra_qdate.isValid() else None
+
+        doc_compra = self.docCompra.text().strip()
+        tipo_documento = self.tipoDocumento.currentText()
+        valor_compra = parse_float(self.valorCompra.text())
+
+        # Obter data da venda do DateLineEdit
+        data_venda_qdate = self.dataVenda.date()
+        data_venda = data_venda_qdate.toString("yyyy-MM-dd") if data_venda_qdate.isValid() else None
+
+        doc_venda = self.docVenda.text().strip()  # Manter como string
+        valor_venda = parse_float(self.valorVenda.text())
+
+        # Imposto é calculado, não lido diretamente
+        imposto = parse_float(self.imposto.text())
+        valor_base = parse_float(self.valorBase.text())
+
+        taxa_str = self.taxa.currentText()
+        taxa = parse_float(taxa_str) if taxa_str != "N/A" else None
+
+        regime_fiscal = ""
+        if self.regime_geral_radio.isChecked():
+            regime_fiscal = "Regime Normal"
+        elif self.regime_lucro_tributavel_radio.isChecked():
+            regime_fiscal = "Margem"
+
+        return {
+            "matricula": matricula,
+            "marca": marca,
+            "numeroQuadro": numero_quadro,
+            "isv": isv,
+            "nRegistoContabilidade": n_registo_contabilidade,
+            "dataCompra": data_compra,
+            "docCompra": doc_compra,
+            "tipoDocumento": tipo_documento,
+            "valorCompra": valor_compra,
+            "dataVenda": data_venda,
+            "docVenda": doc_venda,
+            "valorVenda": valor_venda,
+            "imposto": imposto,
+            "valorBase": valor_base,
+            "taxa": taxa,
+            "regime_fiscal": regime_fiscal
+        }
+
+    def add_record(self):
+        data = self.get_form_data()
+
+        # Validação básica
+        if not all([data["matricula"], data["marca"], data["valorCompra"] is not None]):
+            QMessageBox.warning(self, "Campos Obrigatórios",
+                                "Matrícula, Marca e Valor de Compra são obrigatórios.")
+            return
+
+        if self.mode == "add":
+            if add_expense_to_db(data["matricula"], data["marca"], data["numeroQuadro"], data["isv"],
+                                 data["nRegistoContabilidade"], data["dataCompra"], data["docCompra"],
+                                 data["tipoDocumento"], data["valorCompra"], data["dataVenda"],
+                                 data["docVenda"], data["valorVenda"], data["imposto"],
+                                 data["valorBase"], data["taxa"], data["regime_fiscal"]):
+                QMessageBox.information(self, "Sucesso", "Registo adicionado com sucesso!")
+                self.parent_window.load_table_data()
+                self.accept()
+            else:
+                QMessageBox.critical(self, "Erro", "Erro ao adicionar registo.")
+        elif self.mode == "edit":
+            if self.initial_data and self.initial_data.get("id") is not None:
+                if update_expense_in_db(self.initial_data["id"], data):
+                    QMessageBox.information(self, "Sucesso", "Registo atualizado com sucesso!")
+                    self.parent_window.load_table_data()
+                    self.accept()
+                else:
+                    QMessageBox.critical(self, "Erro", "Erro ao atualizar registo.")
+            else:
+                QMessageBox.critical(self, "Erro", "ID do veículo não encontrado para edição.")
+
+    def update_regime_button_states(self):
+        """Atualiza o estado (enabled/disabled) dos radio buttons do regime fiscal
+        e reinicia a seleção se as condições não forem cumpridas."""
+
+        valor_compra_text = self.valorCompra.text().strip().replace(',', '.')
+        valor_venda_text = self.valorVenda.text().strip().replace(',', '.')
+        taxa_selecionada = self.taxa.currentText()
+
+        try:
+            valor_compra = float(valor_compra_text) if valor_compra_text else 0.0
+            valor_venda = float(valor_venda_text) if valor_venda_text else 0.0
+        except ValueError:
+            valor_compra = 0.0
+            valor_venda = 0.0
+
+        # Condição para habilitar Regime Geral (Normal)
+        # Valor de venda preenchido E valor de compra preenchido E taxa selecionada diferente de "N/A"
+        enable_regime_geral = (
+                valor_compra > 0 and
+                valor_venda > 0 and
+                taxa_selecionada != "N/A"
+        )
+
+        # Condição para habilitar Margem
+        # Valor de venda preenchido E valor de compra preenchido E taxa selecionada diferente de "N/A"
+        # E (Valor Venda - Valor Compra) > 0
+        enable_regime_lucro = (
+                enable_regime_geral and
+                (valor_venda - valor_compra) > 0
+        )
+
+        # Aplicar estados
+        self.regime_geral_radio.setEnabled(enable_regime_geral)
+        self.regime_lucro_tributavel_radio.setEnabled(enable_regime_lucro)
+
+        # Lógica para redefinir seleção se as condições não forem mais válidas
+        # Se um regime estava selecionado e agora está desabilitado, desmarca-o
+        if self.regime_geral_radio.isChecked() and not enable_regime_geral:
+            self.regime_geral_radio.setChecked(False)
+            self.last_valid_regime_radio = None  # Reset do último regime válido
+            print("[DEBUG - AddExpenseDialog] Regime Normal desmarcado (condições não cumpridas).")
+
+        if self.regime_lucro_tributavel_radio.isChecked() and not enable_regime_lucro:
+            self.regime_lucro_tributavel_radio.setChecked(False)
+            self.last_valid_regime_radio = None  # Reset do último regime válido
+            print("[DEBUG - AddExpenseDialog] Regime Margem desmarcado (condições não cumpridas).")
+
+        # Se nenhum regime estiver selecionado e um for agora habilitado, e havia um último válido, seleciona-o
+        if not self.regime_geral_radio.isChecked() and not self.regime_lucro_tributavel_radio.isChecked():
+            if self.last_valid_regime_radio:
+                if self.last_valid_regime_radio == self.regime_geral_radio and enable_regime_geral:
+                    self.regime_geral_radio.setChecked(True)
+                    print("[DEBUG - AddExpenseDialog] Restaurado Regime Normal (último válido).")
+                elif self.last_valid_regime_radio == self.regime_lucro_tributavel_radio and enable_regime_lucro:
+                    self.regime_lucro_tributavel_radio.setChecked(True)
+                    print("[DEBUG - AddExpenseDialog] Restaurado Regime Margem (último válido).")
+            # Se não havia um último regime válido, ou ele não pode ser restaurado, não fazemos nada,
+            # deixando o utilizador escolher.
+
+        self.calculate_regime_fields()  # Recalcula após mudança de estado/seleção
+
+    def handle_regime_selection(self):
+        """Atualiza o 'last_valid_regime_radio' quando o utilizador faz uma seleção."""
+        if self.regime_geral_radio.isChecked():
+            self.last_valid_regime_radio = self.regime_geral_radio
+            print("[DEBUG - AddExpenseDialog] last_valid_regime_radio definido para Regime Normal.")
+        elif self.regime_lucro_tributavel_radio.isChecked():
+            self.last_valid_regime_radio = self.regime_lucro_tributavel_radio
+            print("[DEBUG - AddExpenseDialog] last_valid_regime_radio definido para Margem.")
+        else:
+            self.last_valid_regime_radio = None
+            print("[DEBUG - AddExpenseDialog] Nenhum regime selecionado, last_valid_regime_radio redefinido.")
+        self.calculate_regime_fields()  # Recalcula após a seleção do utilizador
+
+    def calculate_regime_fields(self):
+        """Calcula o Valor Base e o Imposto com base nas novas regras."""
+        valor_compra_text = self.valorCompra.text().strip().replace(',', '.')
+        valor_venda_text = self.valorVenda.text().strip().replace(',', '.')
+        taxa_str = self.taxa.currentText()
+
+        try:
+            valor_compra = Decimal(valor_compra_text) if valor_compra_text else Decimal(0)
+            valor_venda = Decimal(valor_venda_text) if valor_venda_text else Decimal(0)
+            taxa = Decimal(taxa_str) if taxa_str != "N/A" else Decimal(0)
+        except Exception:
+            # Se a conversão falhar, limpa os campos de cálculo e sai
+            self.valorBase.setText("")
+            self.imposto.setText("")
+            return
+
+        valor_base = Decimal(0)
+        imposto = Decimal(0)
+
+        # NOVO: Esta função agora usa QLocale para formatação localizada (pontos de milhar, vírgula decimal)
+        def format_decimal_for_display(value):
+            locale = QLocale(QLocale.Language.Portuguese, QLocale.Country.Portugal)
+            # Define o comportamento de arredondamento para sempre ter duas casas decimais
+            return locale.toString(float(value.quantize(Decimal("0.01"))), 'f', 2)
+
+        if self.regime_geral_radio.isChecked():
+            # Regime Normal: valor base = valor venda, imposto = valor venda * (taxa / 100)
+            valor_base = valor_venda
+            imposto = valor_venda * (taxa / Decimal(100))
+            print(f"[DEBUG - Calc] Regime Normal - Venda: {valor_venda}, Taxa: {taxa}, Imposto: {imposto}")
+        elif self.regime_lucro_tributavel_radio.isChecked():
+            # Regime da Margem: valor base = valor venda - valor compra, imposto = valor base * (taxa / 100)
+            margem = valor_venda - valor_compra
+            if margem > 0:
+                valor_base = margem
+                imposto = margem * (taxa / Decimal(100))
+            else:
+                # Se a margem for <= 0, não há imposto neste regime
+                valor_base = Decimal(0)
+                imposto = Decimal(0)
+            print(
+                f"[DEBUG - Calc] Regime Margem - Venda: {valor_venda}, Compra: {valor_compra}, Margem: {margem}, Taxa: {taxa}, Imposto: {imposto}")
+        else:
+            # Se nenhum regime estiver selecionado, os campos ficam vazios
+            self.valorBase.setText("")
+            self.imposto.setText("")
+            return  # Sai da função, pois não há cálculo a fazer
+
+        # Arredondar para duas casas decimais
+        valor_base = valor_base.quantize(Decimal("0.01"))
+        imposto = imposto.quantize(Decimal("0.01"))
+
+        self.valorBase.setText(format_decimal_for_display(valor_base))
+        self.imposto.setText(format_decimal_for_display(imposto))
+
+
+class ExpenseApp(QWidget):
+    def __init__(self):
+        super().__init__()
+        self.init_ui()
+        self.apply_styles()
+        self.load_table_data()
+        self.showMaximized()  # Definir para iniciar em tela cheia
+
+    def init_ui(self):
+        self.setWindowTitle("MBAuto - Gestão de Despesas de Viaturas")
+        # Removido self.setGeometry, pois showMaximized() o substituirá
+        # self.setGeometry(100, 100, 1000, 600)  # Maior para acomodar as colunas
+
+        self.table = QTableWidget()
+        self.table.setColumnCount(7)  # ID, Matrícula, Marca, Valor Compra, Doc Venda, Valor Venda, Imposto
+        self.table.setHorizontalHeaderLabels(
+            ["ID", "Matrícula", "Marca", "Valor Compra", "Doc. Venda", "Valor Venda", "Imposto"])
+        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)  # Make table non-editable
+        self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)  # Selects entire row
+
+        # --- CONECTAR O SINAL DE DUPLO CLIQUE ---
+        self.table.doubleClicked.connect(self.show_edit_dialog)
+
+        # Hide the ID column
+        self.table.setColumnHidden(0, True)
+
+        self.add_button = QPushButton("Adicionar Registo")
+        self.delete_button = QPushButton("Apagar Registo")
+        self.search_input = QLineEdit()
+        self.search_input.setPlaceholderText("Pesquisar por Matrícula ou Marca...")
+
+        # Conectar o sinal returnPressed para pesquisar ao pressionar Enter
+        self.search_input.returnPressed.connect(self.search_expenses)
+
+        # Botão de limpar pesquisa (X)
+        self.clear_search_button = QPushButton("X")
+        self.clear_search_button.setObjectName("clearSearchButton")  # Para aplicar estilo CSS específico
+        self.clear_search_button.setToolTip("Limpar pesquisa e mostrar todos os registos")
+        self.clear_search_button.clicked.connect(self.clear_search)
+
+        # Botão de pesquisa (Lupa)
+        self.search_button = QPushButton("🔍")  # Ícone de lupa (Unicode)
+        self.search_button.setObjectName("searchButton")  # Para aplicar estilo CSS específico
+        self.search_button.setToolTip("Pesquisar registos")
+        self.search_button.clicked.connect(self.search_expenses)
+
+        # Layouts
+        button_layout = QHBoxLayout()
+        button_layout.addWidget(self.add_button)
+        button_layout.addWidget(self.delete_button)
+        button_layout.addStretch(1)  # Push buttons to the left
+
+        search_layout = QHBoxLayout()
+        search_layout.addWidget(self.search_input)
+        search_layout.addWidget(self.clear_search_button)  # X antes da lupa
+        search_layout.addWidget(self.search_button)  # Botão de pesquisa (Lupa)
+
+        self.add_button.clicked.connect(self.show_add_dialog)
+        self.delete_button.clicked.connect(self.delete_expense)
+        # self.search_button.clicked.connect(self.search_expenses) # Conectado acima
+
+        main_layout = QVBoxLayout()
+        main_layout.addLayout(button_layout)
+        main_layout.addLayout(search_layout)
+        main_layout.addWidget(self.table)
+
+        self.setLayout(main_layout)
+
+    def apply_styles(self):
+        self.setStyleSheet("""
+    /* Base styling */
+    QWidget {
+        background-color: #e3e9f2;
+        font-family: Arial, sans-serif;
+        font-size: 14px;
+        color: #333;
+    }
+
+    /* Headings for labels */
+    QLabel {
+        font-size: 16px;
+        color: #2c3e50;
+        font-weight: bold;
+        padding: 5px;
+    }
+
+    /* Styling for input fields */
+    QLineEdit, QComboBox {
+        background-color: #ffffff;
+        font-size: 14px;
+        color: #333;
+        border: 1px solid #b0bfc6;
+        border-radius: 5px;
+        padding: 5px;
+    }
+    QLineEdit:hover, QComboBox:hover {
+        border: 1px solid #4caf50;
+    }
+    QLineEdit:focus, QComboBox:focus {
+        border: 1px solid #2a9d8f;
+        background-color: #f5f9fc;
+    }
+
+    /* Table styling */
+    QTableWidget {
+        background-color: #ffffff;
+        alternate-background-color: #f2f7fb;
+        gridline-color: #c0c9d0;
+        font-size: 14px;
+        border: 1px solid #cfd9e1;
+    }
+
+    /* A COR DE SELEÇÃO DEVE SER MAIS ESPECÍFICA PARA SOBREPÔR OUTRAS CORES */
+    QTableWidget::item:selected {
+        background-color: #d0d7de; /* Cor de seleção cinza mais clara */
+        color: #000000;
+    }
+
+    /* NOVO: Estilo para itens vendidos - será sobreposto por ::item:selected */
+    /* Este estilo aplica-se ao item individual, o que pode ser mais robusto */
+    QTableWidget::item[sold="true"] { /* Usamos uma propriedade dinâmica 'sold' */
+        background-color: #d4edda; /* Verde pastel para vendido */
+        color: #333; /* Cor do texto para contraste */
+    }
+
+
+    QHeaderView::section {
+        background-color: #4caf50;
+        color: white;
+        font-weight: bold;
+        padding: 4px;
+        border: 1px solid #cfd9e1;
+    }
+
+    /* Scroll bar styling */
+    QScrollBar:vertical {
+        width: 12px;
+        background-color: #f0f0f0;
+        border: none;
+    }
+    QScrollBar::handle:vertical {
+        background-color: #4caf50;
+        min-height: 20px;
+        border-radius: 5px;
+    }
+    QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+        background: none;
+    }
+
+    /* Buttons */
+    QPushButton {
+        background-color: #4caf50;
+        color: white;
+        padding: 10px 15px;
+        border-radius: 5px;
+        font-size: 14px;
+        font-weight: bold;
+        transition: background-color 0.3s;
+    }
+    QPushButton:hover {
+        background-color: #45a049;
+    }
+    QPushButton:pressed {
+        background-color: #3d8b40;
+    }
+    QPushButton:disabled {
+        background-color: #c8c8c8;
+        color: #6e6e6e;
+    }
+
+    /* Estilo para o botão de Limpar Pesquisa (o "X") */
+    QPushButton#clearSearchButton {
+        background-color: transparent;
+        border: none;
+        color: #555555;
+        padding: 0px 5px;
+        border-radius: 5px;
+        font-size: 18px;
+        font-weight: bold;
+        min-width: 25px;
+    }
+    QPushButton#clearSearchButton:hover {
+        background-color: #e0e0e0;
+        border-radius: 5px;
+    }
+    QPushButton#clearSearchButton:pressed {
+        background-color: #cccccc;
+    }
+
+    /* NOVO: Estilo para o botão de Pesquisa (a "Lupa") */
+    QPushButton#searchButton {
+        background-color: transparent;
+        border: none;
+        color: #555555;
+        padding: 0px 5px;
+        border-radius: 5px;
+        font-size: 18px;
+        font-weight: bold;
+        min-width: 25px;
+    }
+    QPushButton#searchButton:hover {
+        background-color: #e0e0e0;
+        border-radius: 5px;
+    }
+    QPushButton#searchButton:pressed {
+        background-color: #cccccc;
+    }
+
+
+    /* Tooltip styling */
+    QToolTip {
+        background-color: #2c3e50;
+        color: #ffffff;
+        border: 1px solid #333;
+        font-size: 12px;
+        padding: 5px;
+        border-radius: 4px;
+    }
+
+    /* ESTILO PARA QRadioButton */
+    QRadioButton {
+        color: #333;
+        padding: 4px 0px;
+    }
+
+    QRadioButton::indicator {
+        width: 16px;
+        height: 16px;
+        border-radius: 8px;
+        border: 2px solid #555555;
+        background-color: #ffffff;
+    }
+
+    QRadioButton::indicator:hover {
+        border: 2px solid #4caf50;
+    }
+
+    QRadioButton::indicator:checked {
+        background-color: #4caf50;
+        border: 2px solid #2a9d8f;
+    }
+
+    /* NOVO ESTILO: QRadioButton quando desabilitado */
+    QRadioButton:disabled {
+        color: #a0a0a0;
+    }
+
+    QRadioButton::indicator:disabled {
+        background-color: #e0e0e0;
+        border: 2px solid #b0b0b0;
+    }
+
+    /* Estilo para QCalendarWidget */
+    QCalendarWidget {
+        background-color: #ffffff;
+        border: 1px solid #cfd9e1;
+        border-radius: 5px;
+    }
+
+    /* Barra de navegação do calendário (onde está o mês e ano) */
+    QCalendarWidget QWidget#qt_calendar_navigationbar {
+        background-color: #e8ecf4;
+        color: #333;
+        border-top-left-radius: 5px;
+        border-top-right-radius: 5px;
+        border: none;
+    }
+
+    /* Estilo dos botões de navegação (setas) e spinbox de ano/mês */
+    QCalendarWidget QAbstractSpinBox,
+    QCalendarWidget QPushButton {
+        background-color: #e8ecf4;
+        color: #4caf50;
+        border: 1px solid #b0bfc6;
+        border-radius: 3px;
+        font-size: 14px;
+        padding: 3px 5px;
+    }
+    QCalendarWidget QAbstractSpinBox:hover,
+    QCalendarWidget QPushButton:hover {
+        background-color: #dbe2ea;
+    }
+    QCalendarWidget QAbstractSpinBox:pressed,
+    QCalendarWidget QPushButton:pressed {
+        background-color: #c9d0d9;
+    }
+
+    /* Setas dentro do Spinbox */
+    QCalendarWidget QSpinBox::up-button,
+    QCalendarWidget QSpinBox::down-button {
+        subcontrol-origin: border;
+        subcontrol-position: right;
+        width: 16px;
+        border-left: 1px solid #b0bfc6;
+        background-color: #e8ecf4;
+        border-top-right-radius: 3px;
+        border-bottom-right-radius: 3px;
+    }
+    QCalendarWidget QSpinBox::up-button:hover,
+    QCalendarWidget QSpinBox::down-button:hover {
+        background-color: #dbe2ea;
+    }
+    QCalendarWidget QSpinBox::up-arrow,
+    QCalendarWidget QSpinBox::down-arrow {
+        background-color: transparent;
+        color: #4caf50;
+    }
+
+    /* Cabeçalho da grelha do calendário (Dias da Semana - Seg, Ter, Qua, etc.) */
+    QCalendarWidget QAbstractItemView {
+        background-color: #ffffff;
+        selection-background-color: #a0d4a3;
+        selection-color: #000000;
+        outline: none;
+        border-bottom: 1px solid #e0e0e0;
+    }
+
+    QCalendarWidget QAbstractItemView QHeaderView::section {
+        background-color: #f0f0f0;
+        color: #555555;
+        border: none;
+        padding: 5px;
+    }
+
+    /* Estilo para o dia normal no calendário */
+    QCalendarWidget QAbstractItemView:enabled {
+        color: #333;
+    }
+
+    QCalendarWidget QAbstractItemView:enabled:hover {
+        background-color: #e6ffe6;
+        border-radius: 3px;
+    }
+
+    QCalendarWidget QAbstractItemView:selected {
+        background-color: #2a9d8f;
+        color: white;
+        border-radius: 3px;
+    }
+
+    /* Para o dia de hoje - AGORA COM CIRCULO VERDE MAIS CLARO */
+    QCalendarWidget QAbstractItemView:!selected:focus {
+        background-color: #d4f7d4;
+        color: #000000;
+        border: 1px solid #4caf50;
+        border-radius: 50%;
+    }
+
+    /* Para a borda à volta do número do dia */
+    QCalendarWidget QCalendarView::item {
+        border-radius: 0px;
+        padding: 4px;
+    }
+
+    /* Dias desabilitados (fora do mês atual) */
+    QCalendarWidget QAbstractItemView:disabled {
+        color: #cccccc;
     }
 """)
 
@@ -1432,9 +3329,6 @@ class ExpenseApp(QWidget):
 
     def search_expenses(self):
         search_text = self.search_input.text().strip().lower()
-        if not search_text:
-            self.load_table_data()  # If search box is empty, load all data
-            return
 
         # Fetch all data and filter in memory for simplicity
         all_expenses = fetch_expenses()
@@ -1482,3 +3376,8 @@ class ExpenseApp(QWidget):
                         item.setData(Qt.ItemDataRole.UserRole, True)  # Set custom role data
                     self.table.setItem(row_idx, col_id, item)
                 row_idx += 1
+
+    def clear_search(self):
+        """Limpa o campo de pesquisa e recarrega todos os dados da tabela."""
+        self.search_input.clear()
+        self.load_table_data()
