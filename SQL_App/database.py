@@ -87,8 +87,8 @@ def add_expense_to_db(matricula, marca, isv, nRegistoContabilidade, dataCompra, 
     query = QSqlQuery()
     query.prepare(
         "INSERT INTO vehicles (matricula, marca, isv, nRegistoContabilidade, dataCompra, docCompra, "
-        "tipoDocumento, valorCompra, dataVenda, docVenda, valorVenda, imposto, valorBase, taxa, regime_fiscal) " # 'valorBase' na lista de colunas
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)" # 15 PLACEHOLDERS '?'
+        "tipoDocumento, valorCompra, dataVenda, docVenda, valorVenda, imposto, valorBase, taxa, regime_fiscal) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
     )
     query.addBindValue(matricula)
     query.addBindValue(marca)

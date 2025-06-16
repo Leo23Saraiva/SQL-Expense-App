@@ -350,14 +350,20 @@ class AddExpenseDialog(QDialog):
 
     # Função auxiliar para lidar com a conversão e arredondamento (reutilizada)
     def get_float_value(self, lineEdit_text):
-        # Remove espaços em branco e substitui vírgulas por pontos para que float() possa converter
-        text = lineEdit_text.replace(",", ".").strip()
-        if text:
-            try:
-                return round(float(text), 2)
-            except ValueError:
-                return None
-        return None  # Retorna None se o campo estiver vazio ou não numérico
+        if not lineEdit_text:
+            return None
+
+        text = str(lineEdit_text)
+        # Primeiro remover todos os tipos de espaço
+        text = text.replace("\u202f", "").replace(" ", "").replace("\xa0", "").strip()
+        # Agora substituir a vírgula decimal por ponto
+        text = text.replace(",", ".")
+
+        try:
+            return round(float(text), 2)
+        except ValueError:
+            print(f"[DEBUG] Erro ao converter valor para float: {text}")
+            return None
 
     # Validação para o Regime Normal (Valor de Venda e Imposto)
     def are_normal_regime_fields_valid(self):
@@ -400,6 +406,11 @@ class AddExpenseDialog(QDialog):
 
                         self.valorBase.setText(locale.toString(valor_base_calculado, 'f', 2))
                         self.taxa.setText(locale.toString(taxa_calculada, 'f', 2))
+
+                        print(f"[DEBUG] Valor calculado - valorBase: {valor_base_calculado}")
+                        print(f"[DEBUG] Valor calculado - taxa: {taxa_calculada}")
+                        print(f"[DEBUG] Texto aplicado - valorBase: {self.valorBase.text()}")
+                        print(f"[DEBUG] Texto aplicado - taxa: {self.taxa.text()}")
                     else:
                         self.valorBase.setText("Divisão por Zero")
                         self.taxa.setText("Erro")
@@ -423,6 +434,11 @@ class AddExpenseDialog(QDialog):
 
                         self.valorBase.setText(locale.toString(valor_base_calculado, 'f', 2))
                         self.taxa.setText(locale.toString(taxa_calculada, 'f', 2))
+
+                        print(f"[DEBUG] Valor calculado - valorBase: {valor_base_calculado}")
+                        print(f"[DEBUG] Valor calculado - taxa: {taxa_calculada}")
+                        print(f"[DEBUG] Texto aplicado - valorBase: {self.valorBase.text()}")
+                        print(f"[DEBUG] Texto aplicado - taxa: {self.taxa.text()}")
                     else:
                         self.valorBase.setText("Divisão por Zero")
                         self.taxa.setText("Erro")
@@ -549,6 +565,7 @@ class AddExpenseDialog(QDialog):
         return True
 
     def add_record(self):
+        self.calculate_regime_fields()
         # Antes de adicionar/atualizar, chamar a validação final
         if not self.validate_all_fields_for_save():
             return  # Se a validação falhar, não prossegue com a gravação
@@ -562,7 +579,8 @@ class AddExpenseDialog(QDialog):
             # Certifique-se de que valorBase e taxa são lidos dos campos, não recalculados aqui
             valorBase_from_field = self.get_float_value(self.valorBase.text())
             taxa_from_field = self.get_float_value(self.taxa.text())
-
+            print(f"[DEBUG] valorBase_from_field: {valorBase_from_field}")
+            print(f"[DEBUG] taxa_from_field: {taxa_from_field}")
             data_compra_str = self.dataCompra.date().toString("yyyy-MM-dd")
             data_venda_str = self.dataVenda.date().toString("yyyy-MM-dd")
 
