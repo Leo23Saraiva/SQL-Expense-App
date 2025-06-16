@@ -60,18 +60,18 @@ class AddExpenseDialog(QDialog):
         self.marca.setText(self.initial_data.get("marca", ""))
 
         # --- FUNÇÃO AUXILIAR PARA FORMATAR NÚMEROS REAIS (Vazio para None/Vazio) ---
+        # NOVO: Esta função agora usa QLocale para formatação localizada (pontos de milhar, vírgula decimal)
         def format_real_for_display(value):
-            # Tenta converter para float. Se for None ou string vazia, retorna string vazia.
+            locale = QLocale(QLocale.Language.Portuguese, QLocale.Country.Portugal)
             try:
                 if value is None or (isinstance(value, str) and not value.strip()):
-                    return ""  # Retorna vazio se o valor for None ou string vazia
+                    return ""
                 else:
                     numeric_value = float(value)
-                    return f"{numeric_value:.2f}".replace('.', ',')
+                    # Formata como moeda, mas sem o símbolo da moeda, com 2 casas decimais
+                    return locale.toString(numeric_value, 'f', 2)
             except (ValueError, TypeError):
-                # Caso haja algum valor não numérico inesperado, retorna string vazia.
                 return ""
-
         # --- FIM DA FUNÇÃO AUXILIAR ---
 
         self.isv.setText(format_real_for_display(self.initial_data.get("isv")))
@@ -350,15 +350,14 @@ class AddExpenseDialog(QDialog):
 
     # Função auxiliar para lidar com a conversão e arredondamento (reutilizada)
     def get_float_value(self, lineEdit_text):
-        # Remove espaços em branco e substitui vírgulas por pontos
+        # Remove espaços em branco e substitui vírgulas por pontos para que float() possa converter
         text = lineEdit_text.replace(",", ".").strip()
         if text:
             try:
                 return round(float(text), 2)
             except ValueError:
-                # Se a conversão falhar (ex: texto não numérico), retorna None
                 return None
-        return None  # Retorna None se o campo estiver vazio
+        return None  # Retorna None se o campo estiver vazio ou não numérico
 
     # Validação para o Regime Normal (Valor de Venda e Imposto)
     def are_normal_regime_fields_valid(self):
@@ -383,6 +382,9 @@ class AddExpenseDialog(QDialog):
         self.valorBase.blockSignals(True)
         self.taxa.blockSignals(True)
 
+        # Usar QLocale para formatar os resultados
+        locale = QLocale(QLocale.Language.Portuguese, QLocale.Country.Portugal)
+
         try:
             if self.regime_geral_radio.isChecked() and self.are_normal_regime_fields_valid():
                 # Lógica de cálculo para Regime Normal
@@ -391,11 +393,13 @@ class AddExpenseDialog(QDialog):
 
                 if valor_venda is not None and imposto_percent is not None:
                     # Cálculo para Regime Normal
-                    if (1 + imposto_percent / 100) != 0:
-                        valor_base_calculado = valor_venda / (1 + imposto_percent / 100)
-                        taxa_calculada = valor_base_calculado * 0.23
-                        self.valorBase.setText(f"{valor_base_calculado:.2f}".replace('.', ','))
-                        self.taxa.setText(f"{taxa_calculada:.2f}".replace('.', ','))
+                    divisor = (1 + imposto_percent / 100)
+                    if divisor != 0:
+                        valor_base_calculado = valor_venda / divisor
+                        taxa_calculada = valor_base_calculado * 0.23 # Taxa de 23% sobre o Valor Base
+
+                        self.valorBase.setText(locale.toString(valor_base_calculado, 'f', 2))
+                        self.taxa.setText(locale.toString(taxa_calculada, 'f', 2))
                     else:
                         self.valorBase.setText("Divisão por Zero")
                         self.taxa.setText("Erro")
@@ -411,12 +415,14 @@ class AddExpenseDialog(QDialog):
 
                 if valor_venda is not None and valor_compra is not None and imposto_percent is not None:
                     # Cálculo para Regime de Margem
-                    if (1 + imposto_percent / 100) != 0:
+                    divisor = (1 + imposto_percent / 100)
+                    if divisor != 0:
                         margem_bruta = valor_venda - valor_compra
-                        valor_base_calculado = margem_bruta / (1 + imposto_percent / 100)
-                        taxa_calculada = valor_base_calculado * 0.23
-                        self.valorBase.setText(f"{valor_base_calculado:.2f}".replace('.', ','))
-                        self.taxa.setText(f"{taxa_calculada:.2f}".replace('.', ','))
+                        valor_base_calculado = margem_bruta / divisor
+                        taxa_calculada = valor_base_calculado * 0.23 # Taxa de 23% sobre o Valor Base
+
+                        self.valorBase.setText(locale.toString(valor_base_calculado, 'f', 2))
+                        self.taxa.setText(locale.toString(taxa_calculada, 'f', 2))
                     else:
                         self.valorBase.setText("Divisão por Zero")
                         self.taxa.setText("Erro")
@@ -553,8 +559,9 @@ class AddExpenseDialog(QDialog):
             valor_compra = self.get_float_value(self.valorCompra.text())
             valor_venda = self.get_float_value(self.valorVenda.text())
             imposto = self.get_float_value(self.imposto.text())
-            valorBase = self.get_float_value(self.valorBase.text())
-            taxa = self.get_float_value(self.taxa.text())
+            # Certifique-se de que valorBase e taxa são lidos dos campos, não recalculados aqui
+            valorBase_from_field = self.get_float_value(self.valorBase.text())
+            taxa_from_field = self.get_float_value(self.taxa.text())
 
             data_compra_str = self.dataCompra.date().toString("yyyy-MM-dd")
             data_venda_str = self.dataVenda.date().toString("yyyy-MM-dd")
@@ -579,8 +586,8 @@ class AddExpenseDialog(QDialog):
                     "docVenda": self.docVenda.text(),
                     "valorVenda": valor_venda,
                     "imposto": imposto,
-                    "valorBase": valorBase,
-                    "taxa": taxa,
+                    "valorBase": valorBase_from_field,  # Usar o valor do campo
+                    "taxa": taxa_from_field,            # Usar o valor do campo
                     "regime_fiscal": regime_fiscal
                 })
             else:
@@ -597,8 +604,8 @@ class AddExpenseDialog(QDialog):
                 print(f"docVenda: {self.docVenda.text()}")
                 print(f"valorVenda: {valor_venda}")
                 print(f"imposto: {imposto}")
-                print(f"valorBase: {valorBase}")
-                print(f"taxa: {taxa}")
+                print(f"valorBase: {valorBase_from_field}")  # Usar o valor do campo
+                print(f"taxa: {taxa_from_field}")            # Usar o valor do campo
                 print(f"regime_fiscal: {regime_fiscal}")
                 print("--- Fim dos Argumentos ---")
 
@@ -607,7 +614,7 @@ class AddExpenseDialog(QDialog):
                     nRegistoContabilidade,
                     data_compra_str, self.docCompra.text(),
                     self.tipoDocumento.currentText(), valor_compra, data_venda_str,
-                    self.docVenda.text(), valor_venda, imposto, valorBase, taxa,
+                    self.docVenda.text(), valor_venda, imposto, valorBase_from_field, taxa_from_field, # Passar valores dos campos
                     regime_fiscal
                 )
 
@@ -843,8 +850,9 @@ class ExpenseApp(QWidget):
                         if data is None or (isinstance(data, str) and not str(data).strip()):
                             formatted_data = ""
                         else:
-                            # Assegura que o dado é tratado como float antes de formatar
-                            formatted_data = f"{float(data):.2f}".replace('.', ',')
+                            # NOVO: Usa QLocale para formatar números na tabela
+                            locale = QLocale(QLocale.Language.Portuguese, QLocale.Country.Portugal)
+                            formatted_data = locale.toString(float(data), 'f', 2)
                         self.table.setItem(row_idx, col_idx, QTableWidgetItem(formatted_data))
                     except (ValueError, TypeError):
                         # Se não for um número válido, exibe como string
@@ -874,3 +882,4 @@ class ExpenseApp(QWidget):
         # self.amount.clear()
         # self.description.clear()
         pass
+
