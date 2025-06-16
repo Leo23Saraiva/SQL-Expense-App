@@ -1,14 +1,241 @@
 from PyQt6.QtWidgets import (
-    QWidget, QLabel, QPushButton, QLineEdit, QComboBox, QDateEdit,
+    QWidget, QLabel, QPushButton, QLineEdit, QComboBox,
     QTableWidget, QVBoxLayout, QHBoxLayout, QMessageBox, QTableWidgetItem,
     QHeaderView, QDialog, QGraphicsOpacityEffect, QGroupBox, QFormLayout,
-    QRadioButton
+    QRadioButton, QCalendarWidget
 )
-from PyQt6.QtCore import QDate, Qt, QLocale
+from PyQt6.QtCore import QDate, Qt, QLocale, QEvent
+from PyQt6.QtGui import QValidator
 from decimal import Decimal
 
 from database import fetch_expenses, add_expense_to_db, delete_expense_from_db, update_expense_in_db, \
     fetch_vehicle_by_id
+
+
+# --- NOVA CLASSE AUXILIAR PARA O CAMPO DE DATA PERSONALIZADO ---
+class DateValidator(QValidator):
+    def validate(self, input_str, pos):
+        # Remove a máscara e tenta parsear
+        cleaned_input = input_str.replace('-', '').strip()
+
+        if not cleaned_input:
+            # Se a string estiver vazia, é aceitável.
+            return QValidator.State.Acceptable, input_str, pos
+
+        # Se a string não for vazia, mas tiver menos de 8 dígitos (DDMMAAAA), é intermediária
+        if len(cleaned_input) < 8:
+            return QValidator.State.Intermediate, input_str, pos
+
+        if len(cleaned_input) > 8:
+            # Se tiver mais de 8 dígitos numéricos, é inválida
+            return QValidator.State.Invalid, input_str, pos
+
+        try:
+            day = int(cleaned_input[0:2])
+            month = int(cleaned_input[2:4])
+            year = int(cleaned_input[4:8])
+            qdate = QDate(year, month, day)
+
+            if qdate.isValid():
+                return QValidator.State.Acceptable, input_str, pos
+            else:
+                # Se os números não formam uma data válida (ex: 32-01-2023)
+                return QValidator.State.Invalid, input_str, pos
+        except ValueError:
+            # Se a conversão para int falhar (não são dígitos)
+            return QValidator.State.Invalid, input_str, pos
+
+
+class CalendarDialog(QDialog):
+    def __init__(self, parent=None, initial_date=None):
+        super().__init__(parent)
+        self.setWindowTitle("Selecionar Data")
+        self.setWindowModality(Qt.WindowModality.ApplicationModal)
+        self.setFixedSize(300, 250)  # Tamanho fixo para o diálogo do calendário
+
+        self.calendar = QCalendarWidget()
+        self.calendar.setGridVisible(True)
+        self.calendar.clicked[QDate].connect(self.accept_date)
+
+        # Configurar a data inicial do calendário
+        if initial_date and initial_date.isValid():
+            self.calendar.setSelectedDate(initial_date)
+            # Garantir que o calendário mostra a página do mês/ano da data inicial
+            self.calendar.setCurrentPage(initial_date.year(), initial_date.month())
+        else:
+            # Se a data inicial for inválida ou None, usar a data atual
+            self.calendar.setSelectedDate(QDate.currentDate())
+            self.calendar.setCurrentPage(QDate.currentDate().year(), QDate.currentDate().month())
+
+        v_layout = QVBoxLayout()
+        v_layout.addWidget(self.calendar)
+        self.setLayout(v_layout)
+
+        self.selected_date = None
+
+    def accept_date(self, date):
+        self.selected_date = date
+        self.accept()  # Fecha o diálogo com QDialog.Accepted
+
+
+class DateLineEdit(QHBoxLayout):
+    def __init__(self, parent=None):
+        super().__init__()
+        self.parent_dialog = parent  # Referência ao AddExpenseDialog
+
+        self.date_input = QLineEdit(parent)
+        self.date_input.setPlaceholderText("DD-MM-AAAA")  # Placeholder para ajudar o utilizador
+        # REMOVIDO: self.date_input.setInputMask("99-99-9999")
+        self.date_input.setMinimumHeight(30)
+        self.date_input.setValidator(DateValidator())  # Aplicar o validador
+        self.date_input.textChanged.connect(self._format_date_on_input)  # Adicionar conexão para formatar
+
+        # Event filter para capturar focus in/out
+        self.date_input.installEventFilter(self)
+
+        # Estilo específico para o QLineEdit interno
+        self.date_input.setStyleSheet("""
+            QLineEdit {
+                background-color: #ffffff;
+                font-size: 14px;
+                color: #333;
+                border: 1px solid #b0bfc6;
+                border-radius: 5px;
+                padding: 5px;
+            }
+            QLineEdit:hover {
+                border: 1px solid #4caf50;
+            }
+            QLineEdit:focus {
+                border: 1px solid #2a9d8f;
+                background-color: #f5f9fc;
+            }
+            QLineEdit:invalid {
+                border: 1px solid #ff6347; /* Vermelho/laranja escuro para inválido */
+            }
+            /* O estado intermediate agora tem a mesma borda que o estado normal/default */
+            QLineEdit:intermediate {
+                border: 1px solid #b0bfc6;
+            }
+        """)
+
+        self.calendar_button = QPushButton("📅", parent)  # Ícone de calendário (Unicode)
+        self.calendar_button.setFixedSize(30, 30)  # Tamanho fixo para o botão para que o ícone fique bem
+        self.calendar_button.clicked.connect(self.show_calendar_dialog)
+        # Estilo específico para o QPushButton do calendário para anular o estilo global
+        self.calendar_button.setStyleSheet("""
+            QPushButton {
+                background-color: #4caf50; /* Um verde forte */
+                color: white;
+                border: 1px solid #3d8b40; /* Uma borda ligeiramente mais escura que o fundo */
+                border-radius: 5px;
+                font-size: 16px; /* Tamanho do ícone */
+                padding: 0px; /* Remover padding extra */
+            }
+            QPushButton:hover {
+                background-color: #45a049; /* Verde mais escuro no hover */
+                border: 1px solid #367c39;
+            }
+            QPushButton:pressed {
+                background-color: #3d8b40; /* Verde ainda mais escuro no pressed */
+                border: 1px solid #2f6932;
+            }
+        """)
+
+        self.addWidget(self.date_input)
+        self.addWidget(self.calendar_button)
+        self.setStretch(0, 1)  # Permite que o campo de texto ocupe a maior parte do espaço
+
+    def eventFilter(self, obj, event):
+        if obj == self.date_input:
+            if event.type() == QEvent.Type.FocusOut:
+                self._handle_focus_out()
+            elif event.type() == QEvent.Type.FocusIn:
+                self._handle_focus_in()
+        return super().eventFilter(obj, event)
+
+    def _handle_focus_in(self):
+        # Quando o campo ganha foco, se estiver vazio, não faz nada (placeholder já está visível)
+        pass
+
+    def _handle_focus_out(self):
+        current_text = self.date_input.text().strip()
+        validator_state, _, _ = self.date_input.validator().validate(current_text, 0)
+
+        if validator_state == QValidator.State.Invalid:
+            self.date_input.clear()  # Limpa completamente se a data for inválida
+        elif validator_state == QValidator.State.Intermediate:
+            # Se for incompleta, tenta parsear para ver se é algo razoável
+            qdate = self.date()
+            if not qdate.isValid():
+                self.date_input.clear()  # Limpa se for incompleta e não puder ser uma data válida
+        # Se for Acceptable (válida ou vazia), não faz nada.
+
+    def _format_date_on_input(self, text):
+        cleaned_text = text.replace('-', '').strip()
+        formatted_text = ""
+
+        if len(cleaned_text) > 0:
+            if len(cleaned_text) <= 2:
+                formatted_text = cleaned_text
+            elif len(cleaned_text) <= 4:
+                formatted_text = f"{cleaned_text[0:2]}-{cleaned_text[2:4]}"
+            elif len(cleaned_text) <= 8:
+                formatted_text = f"{cleaned_text[0:2]}-{cleaned_text[2:4]}-{cleaned_text[4:8]}"
+            else:
+                formatted_text = f"{cleaned_text[0:2]}-{cleaned_text[2:4]}-{cleaned_text[4:8]}"  # Corta para 8 digitos
+
+            # Evita loops infinitos ao definir o texto
+            if self.date_input.text() != formatted_text:
+                self.date_input.setText(formatted_text)
+                self.date_input.setCursorPosition(len(formatted_text))  # Mover cursor para o final
+
+    def show_calendar_dialog(self):
+        # Tenta obter a data atual do QLineEdit
+        current_date_qdate = self.date()  # Usa o método .date() que retorna QDate ou QDate() inválida
+
+        # Cria o diálogo do calendário com a data inicial
+        # Se current_date_qdate for inválida (campo vazio ou data mal formatada), o CalendarDialog usará currentDate()
+        dialog = CalendarDialog(self.parent_dialog, current_date_qdate)
+
+        if dialog.exec() == QDialog.DialogCode.Accepted and dialog.selected_date:
+            # Formata a data selecionada para "DD-MM-AAAA" e define no QLineEdit
+            self.date_input.setText(dialog.selected_date.toString("dd-MM-yyyy"))
+            print(f"[DEBUG] Calendar Selected: Set LineEdit to {self.date_input.text()}")
+        else:
+            # Se o diálogo for cancelado, a data existente no campo não é alterada.
+            # O validador lidará com o estado se a data for inválida ou incompleta.
+            pass
+
+    def text(self):
+        """Retorna o texto do QLineEdit interno."""
+        return self.date_input.text()
+
+    def setText(self, text):
+        """Define o texto do QLineEdit interno."""
+        self.date_input.setText(text)
+
+    def date(self):
+        """Retorna um objeto QDate do texto do QLineEdit interno."""
+        date_str = self.date_input.text().replace('-', '').strip()
+        if len(date_str) == 8:
+            try:
+                day = int(date_str[0:2])
+                month = int(date_str[2:4])
+                year = int(date_str[4:8])
+                qdate = QDate(year, month, day)
+                if qdate.isValid():
+                    return qdate
+            except ValueError:
+                pass
+        return QDate()  # Retorna uma data inválida se não puder ser parseada
+
+    def setDate(self, qdate):
+        """Define a data no QLineEdit interno a partir de um objeto QDate."""
+        if qdate.isValid():
+            self.date_input.setText(qdate.toString("dd-MM-yyyy"))
+        else:
+            self.date_input.clear()
 
 
 class AddExpenseDialog(QDialog):
@@ -86,9 +313,11 @@ class AddExpenseDialog(QDialog):
 
         data_compra_str = self.initial_data.get("dataCompra")
         if data_compra_str:  # Só tenta converter se a string não for vazia ou None
+            # Usa o setter do DateLineEdit
             self.dataCompra.setDate(QDate.fromString(data_compra_str, "yyyy-MM-dd"))
         else:
-            self.dataCompra.setDate(QDate.currentDate())  # Define uma data padrão se não houver data
+            # Limpa o campo se não houver data, para não mostrar a data atual por padrão no edit
+            self.dataCompra.setText("")  # Define como string vazia
 
         self.docCompra.setText(self.initial_data.get("docCompra", ""))
         # Certifique-se de que o item selecionado existe no QComboBox
@@ -103,9 +332,11 @@ class AddExpenseDialog(QDialog):
 
         data_venda_str = self.initial_data.get("dataVenda")
         if data_venda_str:  # Só tenta converter se a string não for vazia ou None
+            # Usa o setter do DateLineEdit
             self.dataVenda.setDate(QDate.fromString(data_venda_str, "yyyy-MM-dd"))
         else:
-            self.dataVenda.setDate(QDate.currentDate())  # Define uma data padrão se não houver data
+            # Limpa o campo se não houver data, para não mostrar a data atual por padrão no edit
+            self.dataVenda.setText("")  # Define como string vazia
 
         self.docVenda.setText(self.initial_data.get("docVenda", ""))
         self.valorVenda.setText(format_real_for_display(self.initial_data.get("valorVenda")))
@@ -165,15 +396,15 @@ class AddExpenseDialog(QDialog):
         self.isv = QLineEdit()
         self.nRegistoContabilidade = QLineEdit()
 
-        self.dataCompra = QDateEdit()
-        self.dataCompra.setDate(QDate.currentDate())
+        # Substituir QDateEdit por DateLineEdit personalizado
+        self.dataCompra = DateLineEdit(self)  # Passar self para a referência parent_dialog
         self.docCompra = QLineEdit()
         self.tipoDocumento = QComboBox()
         self.tipoDocumento.addItems(["Fatura", "Fatura-Recibo", "Fatura Simplificada", "Declaração"])
         self.valorCompra = QLineEdit()
 
-        self.dataVenda = QDateEdit()
-        self.dataVenda.setDate(QDate.currentDate())
+        # Substituir QDateEdit por DateLineEdit personalizado
+        self.dataVenda = DateLineEdit(self)  # Passar self para a referência parent_dialog
         self.docVenda = QLineEdit()
         self.valorVenda = QLineEdit()
 
@@ -214,6 +445,7 @@ class AddExpenseDialog(QDialog):
 
         compras_group = QGroupBox("Detalhes da Compra")
         compras_layout = QFormLayout()
+        # Adiciona o DateLineEdit ao layout usando addLayout
         compras_layout.addRow("Data da Compra:", self.dataCompra)
         compras_layout.addRow("Doc. Compra:", self.docCompra)
         compras_layout.addRow("Tipo Documento:", self.tipoDocumento)
@@ -222,6 +454,7 @@ class AddExpenseDialog(QDialog):
 
         vendas_group = QGroupBox("Detalhes da Venda")
         vendas_layout = QFormLayout()
+        # Adiciona o DateLineEdit ao layout usando addLayout
         vendas_layout.addRow("Data da Venda:", self.dataVenda)
         vendas_layout.addRow("Doc. Venda:", self.docVenda)
         vendas_layout.addRow("Valor de Venda:", self.valorVenda)
@@ -232,8 +465,10 @@ class AddExpenseDialog(QDialog):
         main_layout.addWidget(compras_group)
         main_layout.addWidget(vendas_group)
         main_layout.addWidget(imposto_group)
-        self.dataCompra.setMinimumHeight(30)
-        self.dataVenda.setMinimumHeight(30)
+
+        # Não é necessário definir minimum height aqui para DateLineEdit, ele já tem no construtor
+        # self.dataCompra.setMinimumHeight(30)
+        # self.dataVenda.setMinimumHeight(30)
 
         btn_text = "Atualizar Registo" if self.mode == "edit" else "Adicionar Registo"
         self.add_button = QPushButton(btn_text)
@@ -243,8 +478,11 @@ class AddExpenseDialog(QDialog):
         self.setLayout(main_layout)
 
     def apply_styles(self):
-        if self.parent_window is not None:
-            self.setStyleSheet("""
+        # O stylesheet principal pode permanecer o mesmo, as classes DateLineEdit e CalendarDialog
+        # têm os seus próprios estilos incorporados ou usam os estilos base.
+        # Apenas certifique-se de que não há conflitos ou overrides indesejados.
+        # Adicionei um estilo para QLineEdit:invalid na classe DateLineEdit para o feedback visual.
+        self.setStyleSheet("""
     /* Base styling */
     QWidget {
         background-color: #e3e9f2;
@@ -262,7 +500,8 @@ class AddExpenseDialog(QDialog):
     }
 
     /* Styling for input fields */
-    QLineEdit, QComboBox, QDateEdit {
+    /* QComboBox estilo aqui, QLineEdit tem estilo definido na classe DateLineEdit ou na global */
+    QComboBox {
         background-color: #ffffff;
         font-size: 14px;
         color: #333;
@@ -270,13 +509,30 @@ class AddExpenseDialog(QDialog):
         border-radius: 5px;
         padding: 5px;
     }
-    QLineEdit:hover, QComboBox:hover, QDateEdit:hover {
+    QComboBox:hover {
         border: 1px solid #4caf50; /* Borda verde no hover */
     }
-    QLineEdit:focus, QComboBox:focus, QDateEdit:focus {
+    QComboBox:focus {
         border: 1px solid #2a9d8f; /* Borda verde mais escura no focus */
         background-color: #f5f9fc;
     }
+    /* Estilo geral para QLineEdit, DateLineEdit tem o seu próprio estilo para o QLineEdit interno */
+    QLineEdit {
+        background-color: #ffffff;
+        font-size: 14px;
+        color: #333;
+        border: 1px solid #b0bfc6;
+        border-radius: 5px;
+        padding: 5px;
+    }
+    QLineEdit:hover {
+        border: 1px solid #4caf50; /* Borda verde no hover */
+    }
+    QLineEdit:focus {
+        border: 1px solid #2a9d8f; /* Borda verde mais escura no focus */
+        background-color: #f5f9fc;
+    }
+
 
     /* Table styling */
     QTableWidget {
@@ -315,6 +571,7 @@ class AddExpenseDialog(QDialog):
     }
 
     /* Buttons */
+    /* Este estilo geral para QPushButton é apenas para botões fora do DateLineEdit */
     QPushButton {
         background-color: #4caf50;
         color: white;
@@ -376,6 +633,87 @@ class AddExpenseDialog(QDialog):
     QRadioButton::indicator:disabled {
         background-color: #e0e0e0; /* Fundo cinzento claro para o indicador */
         border: 2px solid #b0b0b0; /* Borda cinzenta mais escura */
+    }
+
+    /* Estilo para QCalendarWidget */
+    QCalendarWidget {
+        background-color: #ffffff;
+        border: 1px solid #cfd9e1;
+        border-radius: 5px;
+    }
+
+    QCalendarWidget QWidget#qt_calendar_navigationbar { /* Barra de navegação */
+        background-color: #f0f0f0; /* Fundo cinza claro */
+        color: #333; /* Cor do texto */
+        border-top-left-radius: 5px;
+        border-top-right-radius: 5px;
+    }
+    /* Estilo dos botões de navegação e ano/mês */
+    QCalendarWidget QWidget#qt_calendar_navigationbar QPushButton {
+        background-color: #4caf50;
+        color: white;
+        border: 1px solid #3d8b40;
+        border-radius: 3px;
+        font-size: 16px;
+        padding: 5px;
+    }
+    QCalendarWidget QWidget#qt_calendar_navigationbar QPushButton:hover {
+        background-color: #45a049;
+    }
+    QCalendarWidget QWidget#qt_calendar_navigationbar QPushButton:pressed {
+        background-color: #3d8b40;
+    }
+    /* Spinbox de ano e mês no calendário */
+    QCalendarWidget QSpinBox {
+        border: 1px solid #b0bfc6;
+        border-radius: 3px;
+        padding-right: 15px; /* Espaço para o botão de seta */
+        color: #333;
+        background-color: #ffffff;
+    }
+    QCalendarWidget QSpinBox::up-button, QCalendarWidget QSpinBox::down-button {
+        width: 16px;
+        border: 1px solid #b0bfc6;
+        border-radius: 3px;
+        background-color: #f0f0f0;
+    }
+    QCalendarWidget QSpinBox::up-arrow, QCalendarWidget QSpinBox::down-arrow {
+        width: 10px;
+        height: 10px;
+    }
+    QCalendarWidget QSpinBox::up-button:hover, QCalendarWidget QSpinBox::down-button:hover {
+        background-color: #e0e0e0;
+    }
+
+    QCalendarWidget QAbstractItemView { /* Grid do calendário */
+        selection-background-color: #d0d7de; /* Cor de fundo da seleção ao passar o rato */
+        selection-color: #000000; /* Cor do texto da seleção ao passar o rato */
+        outline: none; /* Remover a borda de foco */
+    }
+    /* Estilo para o dia atual no calendário */
+    QCalendarWidget QAbstractItemView:enabled {
+        color: #333; /* Cor do texto padrão para dias */
+    }
+
+    QCalendarWidget QAbstractItemView:enabled:hover {
+        background-color: #f2f7fb; /* Cor de fundo ao passar o mouse */
+    }
+
+    QCalendarWidget QAbstractItemView:selected {
+        background-color: #2a9d8f; /* Cor do fundo do dia selecionado (verde mais escuro) */
+        color: white; /* Cor do texto do dia selecionado */
+    }
+
+    /* Para o dia de hoje - agora será um círculo cinza suave com borda verde */
+    QCalendarWidget QAbstractItemView:!selected:focus { /* Dia de hoje, se não estiver selecionado */
+        background-color: #e0e0e0; /* Cinza suave para o dia de hoje */
+        color: #000000;
+        border: 1px solid #4caf50; /* Borda verde suave */
+        border-radius: 50%; /* Faz um círculo */
+    }
+    /* Para a borda à volta do número do dia */
+    QCalendarWidget QCalendarView::item {
+        border-radius: 0px; /* Reset para itens normais */
     }
 """)
 
@@ -568,6 +906,18 @@ class AddExpenseDialog(QDialog):
         if not self.marca.text().strip():
             missing_fields.append("Marca")
 
+        # Validação das datas usando o método .date() do DateLineEdit
+        # Apenas se a data não estiver vazia, verifica se é válida.
+        # Se estiver vazia, o validador já a marca como Acceptable.
+        if self.dataCompra.text().strip() and not self.dataCompra.date().isValid():
+            QMessageBox.warning(self, "Data Inválida",
+                                "Por favor, insira uma 'Data da Compra' válida (DD-MM-AAAA) ou deixe o campo vazio.")
+            return False
+        if self.dataVenda.text().strip() and not self.dataVenda.date().isValid():
+            QMessageBox.warning(self, "Data Inválida",
+                                "Por favor, insira uma 'Data da Venda' válida (DD-MM-AAAA) ou deixe o campo vazio.")
+            return False
+
         if missing_fields:
             QMessageBox.warning(self, "Campos Obrigatórios em Falta",
                                 f"Por favor, preencha os seguintes campos obrigatórios:\n\n- " +
@@ -619,8 +969,9 @@ class AddExpenseDialog(QDialog):
             print(f"[DEBUG] imposto_from_field (antes do DB): {imposto_from_field}")
             print(f"[DEBUG] taxa (antes do DB): {taxa}")
 
-            data_compra_str = self.dataCompra.date().toString("yyyy-MM-dd")
-            data_venda_str = self.dataVenda.date().toString("yyyy-MM-dd")
+            # Obter a string da data do DateLineEdit (já formatada ou vazia)
+            data_compra_str = self.dataCompra.text()
+            data_venda_str = self.dataVenda.text()
 
             regime_fiscal = ""
             if self.regime_geral_radio.isChecked():
@@ -635,11 +986,11 @@ class AddExpenseDialog(QDialog):
                     "numeroQuadro": numero_quadro,
                     "isv": isv,
                     "nRegistoContabilidade": nRegistoContabilidade,
-                    "dataCompra": data_compra_str,
+                    "dataCompra": data_compra_str,  # Usar a string direta do DateLineEdit
                     "docCompra": self.docCompra.text(),
                     "tipoDocumento": self.tipoDocumento.currentText(),
                     "valorCompra": valor_compra,
-                    "dataVenda": data_venda_str,
+                    "dataVenda": data_venda_str,  # Usar a string direta do DateLineEdit
                     "docVenda": self.docVenda.text(),
                     "valorVenda": valor_venda,
                     "imposto": imposto_from_field,
@@ -670,8 +1021,9 @@ class AddExpenseDialog(QDialog):
                 success = add_expense_to_db(
                     self.matricula.text(), self.marca.text(), numero_quadro, isv,
                     nRegistoContabilidade,
-                    data_compra_str, self.docCompra.text(),
+                    data_compra_str, self.docCompra.text(),  # Usar a string direta do DateLineEdit
                     self.tipoDocumento.currentText(), valor_compra, data_venda_str,
+                    # Usar a string direta do DateLineEdit
                     self.docVenda.text(), valor_venda, imposto_from_field, valorBase_from_field, taxa,
                     regime_fiscal
                 )
@@ -761,6 +1113,8 @@ class ExpenseApp(QWidget):
         self.setLayout(layout)
 
     def apply_styles(self):
+        # Apenas um ajuste para o estilo do QLineEdit na classe principal,
+        # pois o DateLineEdit tem seu próprio estilo para o QLineEdit interno.
         self.setStyleSheet("""
     /* Base styling */
     QWidget {
@@ -779,7 +1133,7 @@ class ExpenseApp(QWidget):
     }
 
     /* Styling for input fields */
-    QLineEdit, QComboBox, QDateEdit {
+    QLineEdit, QComboBox { /* Apply this to regular QLineEdit and QComboBox */
         background-color: #ffffff;
         font-size: 14px;
         color: #333;
@@ -787,10 +1141,10 @@ class ExpenseApp(QWidget):
         border-radius: 5px;
         padding: 5px;
     }
-    QLineEdit:hover, QComboBox:hover, QDateEdit:hover {
+    QLineEdit:hover, QComboBox:hover {
         border: 1px solid #4caf50; /* Borda verde no hover */
     }
-    QLineEdit:focus, QComboBox:focus, QDateEdit:focus {
+    QLineEdit:focus, QComboBox:focus {
         border: 1px solid #2a9d8f; /* Borda verde mais escura no focus */
         background-color: #f5f9fc;
     }
@@ -832,6 +1186,7 @@ class ExpenseApp(QWidget):
     }
 
     /* Buttons */
+    /* Este estilo geral para QPushButton é apenas para botões fora do DateLineEdit */
     QPushButton {
         background-color: #4caf50;
         color: white;
@@ -893,6 +1248,87 @@ class ExpenseApp(QWidget):
     QRadioButton::indicator:disabled {
         background-color: #e0e0e0; /* Fundo cinzento claro para o indicador */
         border: 2px solid #b0b0b0; /* Borda cinzenta mais escura */
+    }
+
+    /* Estilo para QCalendarWidget */
+    QCalendarWidget {
+        background-color: #ffffff;
+        border: 1px solid #cfd9e1;
+        border-radius: 5px;
+    }
+
+    QCalendarWidget QWidget#qt_calendar_navigationbar { /* Barra de navegação */
+        background-color: #f0f0f0; /* Fundo cinza claro */
+        color: #333; /* Cor do texto */
+        border-top-left-radius: 5px;
+        border-top-right-radius: 5px;
+    }
+    /* Estilo dos botões de navegação e ano/mês */
+    QCalendarWidget QWidget#qt_calendar_navigationbar QPushButton {
+        background-color: #4caf50;
+        color: white;
+        border: 1px solid #3d8b40;
+        border-radius: 3px;
+        font-size: 16px;
+        padding: 5px;
+    }
+    QCalendarWidget QWidget#qt_calendar_navigationbar QPushButton:hover {
+        background-color: #45a049;
+    }
+    QCalendarWidget QWidget#qt_calendar_navigationbar QPushButton:pressed {
+        background-color: #3d8b40;
+    }
+    /* Spinbox de ano e mês no calendário */
+    QCalendarWidget QSpinBox {
+        border: 1px solid #b0bfc6;
+        border-radius: 3px;
+        padding-right: 15px; /* Espaço para o botão de seta */
+        color: #333;
+        background-color: #ffffff;
+    }
+    QCalendarWidget QSpinBox::up-button, QCalendarWidget QSpinBox::down-button {
+        width: 16px;
+        border: 1px solid #b0bfc6;
+        border-radius: 3px;
+        background-color: #f0f0f0;
+    }
+    QCalendarWidget QSpinBox::up-arrow, QCalendarWidget QSpinBox::down-arrow {
+        width: 10px;
+        height: 10px;
+    }
+    QCalendarWidget QSpinBox::up-button:hover, QCalendarWidget QSpinBox::down-button:hover {
+        background-color: #e0e0e0;
+    }
+
+    QCalendarWidget QAbstractItemView { /* Grid do calendário */
+        selection-background-color: #d0d7de; /* Cor de fundo da seleção ao passar o rato */
+        selection-color: #000000; /* Cor do texto da seleção ao passar o rato */
+        outline: none; /* Remover a borda de foco */
+    }
+    /* Estilo para o dia normal no calendário */
+    QCalendarWidget QAbstractItemView:enabled {
+        color: #333; /* Cor do texto padrão para dias */
+    }
+
+    QCalendarWidget QAbstractItemView:enabled:hover {
+        background-color: #f2f7fb; /* Cor de fundo ao passar o mouse */
+    }
+
+    QCalendarWidget QAbstractItemView:selected {
+        background-color: #2a9d8f; /* Cor do fundo do dia selecionado (verde mais escuro) */
+        color: white; /* Cor do texto do dia selecionado */
+    }
+
+    /* Para o dia de hoje - agora será um círculo cinza suave com borda verde */
+    QCalendarWidget QAbstractItemView:!selected:focus { /* Dia de hoje, se não estiver selecionado */
+        background-color: #e0e0e0; /* Cinza suave para o dia de hoje */
+        color: #000000;
+        border: 1px solid #4caf50; /* Borda verde suave */
+        border-radius: 50%; /* Faz um círculo */
+    }
+    /* Para a borda à volta do número do dia */
+    QCalendarWidget QCalendarView::item {
+        border-radius: 0px; /* Reset para itens normais */
     }
 """)
 
