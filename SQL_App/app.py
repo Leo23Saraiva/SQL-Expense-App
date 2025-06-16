@@ -51,7 +51,7 @@ class CalendarDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle("Selecionar Data")
         self.setWindowModality(Qt.WindowModality.ApplicationModal)
-        self.setFixedSize(300, 250)  # Tamanho fixo para o diálogo do calendário
+        self.setFixedSize(320, 270)  # Aumentado o tamanho fixo para o diálogo do calendário
 
         self.calendar = QCalendarWidget()
         self.calendar.setGridVisible(True)
@@ -85,7 +85,7 @@ class DateLineEdit(QHBoxLayout):
 
         self.date_input = QLineEdit(parent)
         self.date_input.setPlaceholderText("DD-MM-AAAA")  # Placeholder para ajudar o utilizador
-        # REMOVIDO: self.date_input.setInputMask("99-99-9999")
+        # REMOVIDO: self.date_input.setInputMask("99-99-9999") # Máscara removida para depuração e flexibilidade
         self.date_input.setMinimumHeight(30)
         self.date_input.setValidator(DateValidator())  # Aplicar o validador
         self.date_input.textChanged.connect(self._format_date_on_input)  # Adicionar conexão para formatar
@@ -163,17 +163,27 @@ class DateLineEdit(QHBoxLayout):
         validator_state, _, _ = self.date_input.validator().validate(current_text, 0)
 
         if validator_state == QValidator.State.Invalid:
+            print(f"[DEBUG - DateLineEdit] FocusOut: Data '{current_text}' inválida. Limpando campo.")
             self.date_input.clear()  # Limpa completamente se a data for inválida
         elif validator_state == QValidator.State.Intermediate:
             # Se for incompleta, tenta parsear para ver se é algo razoável
             qdate = self.date()
             if not qdate.isValid():
+                print(f"[DEBUG - DateLineEdit] FocusOut: Data '{current_text}' incompleta e inválida. Limpando campo.")
                 self.date_input.clear()  # Limpa se for incompleta e não puder ser uma data válida
-        # Se for Acceptable (válida ou vazia), não faz nada.
+            else:
+                print(
+                    f"[DEBUG - DateLineEdit] FocusOut: Data '{current_text}' incompleta mas válida para QDate. Mantendo.")
+        else:
+            print(f"[DEBUG - DateLineEdit] FocusOut: Data '{current_text}' aceitável. Mantendo.")
 
     def _format_date_on_input(self, text):
         cleaned_text = text.replace('-', '').strip()
         formatted_text = ""
+
+        # Limita a entrada a 8 dígitos para evitar datas muito longas
+        if len(cleaned_text) > 8:
+            cleaned_text = cleaned_text[:8]
 
         if len(cleaned_text) > 0:
             if len(cleaned_text) <= 2:
@@ -182,17 +192,20 @@ class DateLineEdit(QHBoxLayout):
                 formatted_text = f"{cleaned_text[0:2]}-{cleaned_text[2:4]}"
             elif len(cleaned_text) <= 8:
                 formatted_text = f"{cleaned_text[0:2]}-{cleaned_text[2:4]}-{cleaned_text[4:8]}"
-            else:
-                formatted_text = f"{cleaned_text[0:2]}-{cleaned_text[2:4]}-{cleaned_text[4:8]}"  # Corta para 8 digitos
 
             # Evita loops infinitos ao definir o texto
             if self.date_input.text() != formatted_text:
+                self.date_input.blockSignals(True)
                 self.date_input.setText(formatted_text)
-                self.date_input.setCursorPosition(len(formatted_text))  # Mover cursor para o final
+                self.date_input.blockSignals(False)
+                # Garante que o cursor permanece no final ou na posição correta
+                self.date_input.setCursorPosition(len(formatted_text))
 
     def show_calendar_dialog(self):
         # Tenta obter a data atual do QLineEdit
         current_date_qdate = self.date()  # Usa o método .date() que retorna QDate ou QDate() inválida
+        print(
+            f"[DEBUG - DateLineEdit] Abrindo calendário. Data atual do campo: '{self.date_input.text()}' -> QDate: {current_date_qdate.toString(Qt.DateFormat.ISODate)} (isValid: {current_date_qdate.isValid()})")
 
         # Cria o diálogo do calendário com a data inicial
         # Se current_date_qdate for inválida (campo vazio ou data mal formatada), o CalendarDialog usará currentDate()
@@ -201,10 +214,11 @@ class DateLineEdit(QHBoxLayout):
         if dialog.exec() == QDialog.DialogCode.Accepted and dialog.selected_date:
             # Formata a data selecionada para "DD-MM-AAAA" e define no QLineEdit
             self.date_input.setText(dialog.selected_date.toString("dd-MM-yyyy"))
-            print(f"[DEBUG] Calendar Selected: Set LineEdit to {self.date_input.text()}")
+            print(f"[DEBUG - DateLineEdit] Calendar Selected: Set LineEdit to '{self.date_input.text()}'")
         else:
             # Se o diálogo for cancelado, a data existente no campo não é alterada.
             # O validador lidará com o estado se a data for inválida ou incompleta.
+            print("[DEBUG - DateLineEdit] Calendar Cancelled or No Date Selected.")
             pass
 
     def text(self):
@@ -212,11 +226,37 @@ class DateLineEdit(QHBoxLayout):
         return self.date_input.text()
 
     def setText(self, text):
-        """Define o texto do QLineEdit interno."""
-        self.date_input.setText(text)
+        """Define o texto do QLineEdit interno.
+        Esta função também deve ser responsável por formatar o texto corretamente.
+        """
+        print(f"[DEBUG - DateLineEdit] setText called with raw text: '{text}'")
+        if not text:
+            self.date_input.clear()
+            print("[DEBUG - DateLineEdit] setText: Cleared field because text was empty.")
+        else:
+            # Tenta converter o texto para QDate para ver se é um formato válido
+            # Assumimos que o texto de entrada do DB é "yyyy-MM-dd"
+            qdate = QDate.fromString(text, "yyyy-MM-dd")
+            if qdate.isValid():
+                # Se for válido, formata para DD-MM-AAAA e define
+                formatted_text = qdate.toString("dd-MM-yyyy")
+                print(
+                    f"[DEBUG - DateLineEdit] setText: Converted '{text}' (yyyy-MM-dd) to '{formatted_text}' (dd-MM-yyyy).")
+                self.date_input.blockSignals(True)
+                self.date_input.setText(formatted_text)
+                self.date_input.blockSignals(False)
+            else:
+                # Se não for um QDate válido do formato esperado, apenas define o texto bruto
+                # e deixa o validador/formatador lidar com isso no textChanged
+                print(f"[DEBUG - DateLineEdit] setText: '{text}' not a valid yyyy-MM-dd. Setting raw text.")
+                self.date_input.blockSignals(True)
+                self.date_input.setText(text)
+                self.date_input.blockSignals(False)
+        # O textChanged do QLineEdit interno vai chamar _format_date_on_input
+        # que fará a formatação final e posicionamento do cursor.
 
     def date(self):
-        """Retorna um objeto QDate do texto do QLineEdit interno."""
+        """Retorna um objeto QDate do texto do QLineEdit interno (espera DD-MM-AAAA)."""
         date_str = self.date_input.text().replace('-', '').strip()
         if len(date_str) == 8:
             try:
@@ -231,10 +271,20 @@ class DateLineEdit(QHBoxLayout):
         return QDate()  # Retorna uma data inválida se não puder ser parseada
 
     def setDate(self, qdate):
-        """Define a data no QLineEdit interno a partir de um objeto QDate."""
-        if qdate.isValid():
-            self.date_input.setText(qdate.toString("dd-MM-yyyy"))
+        """Define a data no QLineEdit interno a partir de um objeto QDate.
+        Este método é usado para carregar a data programaticamente.
+        """
+        if qdate and qdate.isValid():  # Garante que qdate não é None e é válida
+            formatted_date_str = qdate.toString("dd-MM-yyyy")
+            print(
+                f"[DEBUG - DateLineEdit] setDate called with QDate: {qdate.toString(Qt.DateFormat.ISODate)} (isValid: {qdate.isValid()}). Setting text to '{formatted_date_str}'.")
+            self.date_input.blockSignals(
+                True)  # Bloca sinais para evitar _format_date_on_input ser chamado prematuramente
+            self.date_input.setText(formatted_date_str)
+            self.date_input.blockSignals(False)
+            # A função _format_date_on_input já lida com o posicionamento do cursor
         else:
+            print(f"[DEBUG - DateLineEdit] setDate called with invalid QDate or None. Clearing field.")
             self.date_input.clear()
 
 
@@ -283,6 +333,7 @@ class AddExpenseDialog(QDialog):
                 self.last_valid_regime_radio = self.regime_lucro_tributavel_radio
 
     def populate_fields(self):
+        print("[DEBUG - AddExpenseDialog] Populating fields...")
         # Usar .get() com um valor padrão para evitar KeyError e TypeError se o valor for None
         self.matricula.setText(self.initial_data.get("matricula", ""))
         self.marca.setText(self.initial_data.get("marca", ""))
@@ -311,13 +362,12 @@ class AddExpenseDialog(QDialog):
             str(self.initial_data.get("nRegistoContabilidade", "")) if self.initial_data.get(
                 "nRegistoContabilidade") is not None else "")
 
-        data_compra_str = self.initial_data.get("dataCompra")
-        if data_compra_str:  # Só tenta converter se a string não for vazia ou None
-            # Usa o setter do DateLineEdit
-            self.dataCompra.setDate(QDate.fromString(data_compra_str, "yyyy-MM-dd"))
-        else:
-            # Limpa o campo se não houver data, para não mostrar a data atual por padrão no edit
-            self.dataCompra.setText("")  # Define como string vazia
+        data_compra_str = self.initial_data.get("dataCompra", "")
+        print(f"[DEBUG - AddExpenseDialog] dataCompra_str from DB: '{data_compra_str}'")
+        # Usar o setter do DateLineEdit que lida com QDate ou string vazia
+        # O setText do DateLineEdit vai agora fazer a conversão de yyyy-MM-dd para dd-MM-yyyy
+        self.dataCompra.setText(data_compra_str)
+        print(f"[DEBUG - AddExpenseDialog] After dataCompra.setText, field content: '{self.dataCompra.text()}'")
 
         self.docCompra.setText(self.initial_data.get("docCompra", ""))
         # Certifique-se de que o item selecionado existe no QComboBox
@@ -330,15 +380,14 @@ class AddExpenseDialog(QDialog):
 
         self.valorCompra.setText(format_real_for_display(self.initial_data.get("valorCompra")))
 
-        data_venda_str = self.initial_data.get("dataVenda")
-        if data_venda_str:  # Só tenta converter se a string não for vazia ou None
-            # Usa o setter do DateLineEdit
-            self.dataVenda.setDate(QDate.fromString(data_venda_str, "yyyy-MM-dd"))
-        else:
-            # Limpa o campo se não houver data, para não mostrar a data atual por padrão no edit
-            self.dataVenda.setText("")  # Define como string vazia
+        data_venda_str = self.initial_data.get("dataVenda", "")
+        print(f"[DEBUG - AddExpenseDialog] dataVenda_str from DB: '{data_venda_str}'")
+        # Usar o setter do DateLineEdit que lida com QDate ou string vazia
+        self.dataVenda.setText(data_venda_str)
+        print(f"[DEBUG - AddExpenseDialog] After dataVenda.setText, field content: '{self.dataVenda.text()}'")
 
-        self.docVenda.setText(self.initial_data.get("docVenda", ""))
+        self.docVenda.setText(
+            format_real_for_display(self.initial_data.get("docVenda")))  # Este deve ser texto, não real.
         self.valorVenda.setText(format_real_for_display(self.initial_data.get("valorVenda")))
 
         # Aplicar a função de formatação para imposto, valorBase
@@ -374,6 +423,7 @@ class AddExpenseDialog(QDialog):
         self.regime_lucro_tributavel_radio.blockSignals(True)
 
         regime_salvo = self.initial_data.get("regime_fiscal", "")
+        print(f"[DEBUG - AddExpenseDialog] Regime fiscal from DB: '{regime_salvo}'")
         if regime_salvo == "Regime Normal":
             self.regime_geral_radio.setChecked(True)
         elif regime_salvo == "Margem":
@@ -384,6 +434,7 @@ class AddExpenseDialog(QDialog):
 
         self.regime_geral_radio.blockSignals(False)
         self.regime_lucro_tributavel_radio.blockSignals(False)
+        print("[DEBUG - AddExpenseDialog] Populating fields finished.")
 
     def init_ui(self):
         self.setWindowTitle("MBAuto - Detalhes")
@@ -478,10 +529,8 @@ class AddExpenseDialog(QDialog):
         self.setLayout(main_layout)
 
     def apply_styles(self):
-        # O stylesheet principal pode permanecer o mesmo, as classes DateLineEdit e CalendarDialog
-        # têm os seus próprios estilos incorporados ou usam os estilos base.
-        # Apenas certifique-se de que não há conflitos ou overrides indesejados.
-        # Adicionei um estilo para QLineEdit:invalid na classe DateLineEdit para o feedback visual.
+        # Apenas um ajuste para o estilo do QLineEdit na classe principal,
+        # pois o DateLineEdit tem seu próprio estilo para o QLineEdit interno.
         self.setStyleSheet("""
     /* Base styling */
     QWidget {
@@ -500,8 +549,7 @@ class AddExpenseDialog(QDialog):
     }
 
     /* Styling for input fields */
-    /* QComboBox estilo aqui, QLineEdit tem estilo definido na classe DateLineEdit ou na global */
-    QComboBox {
+    QLineEdit, QComboBox { /* Apply this to regular QLineEdit and QComboBox */
         background-color: #ffffff;
         font-size: 14px;
         color: #333;
@@ -509,30 +557,13 @@ class AddExpenseDialog(QDialog):
         border-radius: 5px;
         padding: 5px;
     }
-    QComboBox:hover {
+    QLineEdit:hover, QComboBox:hover {
         border: 1px solid #4caf50; /* Borda verde no hover */
     }
-    QComboBox:focus {
+    QLineEdit:focus, QComboBox:focus {
         border: 1px solid #2a9d8f; /* Borda verde mais escura no focus */
         background-color: #f5f9fc;
     }
-    /* Estilo geral para QLineEdit, DateLineEdit tem o seu próprio estilo para o QLineEdit interno */
-    QLineEdit {
-        background-color: #ffffff;
-        font-size: 14px;
-        color: #333;
-        border: 1px solid #b0bfc6;
-        border-radius: 5px;
-        padding: 5px;
-    }
-    QLineEdit:hover {
-        border: 1px solid #4caf50; /* Borda verde no hover */
-    }
-    QLineEdit:focus {
-        border: 1px solid #2a9d8f; /* Borda verde mais escura no focus */
-        background-color: #f5f9fc;
-    }
-
 
     /* Table styling */
     QTableWidget {
@@ -643,14 +674,14 @@ class AddExpenseDialog(QDialog):
     }
 
     QCalendarWidget QWidget#qt_calendar_navigationbar { /* Barra de navegação */
-        background-color: #f0f0f0; /* Fundo cinza claro */
-        color: #333; /* Cor do texto */
+        background-color: #e8ecf4; 
+        color: white; /* Cor do texto para toda a barra */
         border-top-left-radius: 5px;
         border-top-right-radius: 5px;
     }
     /* Estilo dos botões de navegação e ano/mês */
     QCalendarWidget QWidget#qt_calendar_navigationbar QPushButton {
-        background-color: #4caf50;
+        background-color: #4caf50; /* Verde */
         color: white;
         border: 1px solid #3d8b40;
         border-radius: 3px;
@@ -668,8 +699,8 @@ class AddExpenseDialog(QDialog):
         border: 1px solid #b0bfc6;
         border-radius: 3px;
         padding-right: 15px; /* Espaço para o botão de seta */
-        color: #333;
-        background-color: #ffffff;
+        color: white; /* Cor do texto do spinbox */
+        background-color: #4caf50; /* Fundo verde para o spinbox */
     }
     QCalendarWidget QSpinBox::up-button, QCalendarWidget QSpinBox::down-button {
         width: 16px;
@@ -690,7 +721,7 @@ class AddExpenseDialog(QDialog):
         selection-color: #000000; /* Cor do texto da seleção ao passar o rato */
         outline: none; /* Remover a borda de foco */
     }
-    /* Estilo para o dia atual no calendário */
+    /* Estilo para o dia normal no calendário */
     QCalendarWidget QAbstractItemView:enabled {
         color: #333; /* Cor do texto padrão para dias */
     }
@@ -781,10 +812,8 @@ class AddExpenseDialog(QDialog):
                         self.valorBase.setText(locale.toString(valor_base_calculado, 'f', 2))
                         self.imposto.setText(locale.toString(imposto_calculado, 'f', 2))
 
-                        print(f"[DEBUG] Valor calculado - valorBase: {valor_base_calculado}")
-                        print(f"[DEBUG] Valor calculado - imposto: {imposto_calculado}")
-                        print(f"[DEBUG] Texto aplicado - valorBase: {self.valorBase.text()}")
-                        print(f"[DEBUG] Texto aplicado - imposto: {self.imposto.text()}")
+                        print(f"[DEBUG] Valor calculado - valorBase (Regime Normal): {valor_base_calculado}")
+                        print(f"[DEBUG] Valor calculado - imposto (Regime Normal): {imposto_calculado}")
                     else:
                         self.valorBase.setText("Divisão por Zero")
                         self.imposto.setText("Erro")
@@ -808,10 +837,8 @@ class AddExpenseDialog(QDialog):
                         self.valorBase.setText(locale.toString(valor_base_calculado, 'f', 2))
                         self.imposto.setText(locale.toString(imposto_calculado, 'f', 2))
 
-                        print(f"[DEBUG] Valor calculado - valorBase: {valor_base_calculado}")
-                        print(f"[DEBUG] Valor calculado - imposto: {imposto_calculado}")
-                        print(f"[DEBUG] Texto aplicado - valorBase: {self.valorBase.text()}")
-                        print(f"[DEBUG] Texto aplicado - imposto: {self.imposto.text()}")
+                        print(f"[DEBUG] Valor calculado - valorBase (Margem): {valor_base_calculado}")
+                        print(f"[DEBUG] Valor calculado - imposto (Margem): {imposto_calculado}")
                     else:
                         self.valorBase.setText("Divisão por Zero")
                         self.imposto.setText("Erro")
@@ -965,13 +992,30 @@ class AddExpenseDialog(QDialog):
             valorBase_from_field = self.get_float_value(self.valorBase)  # Ajustado para passar o widget
             imposto_from_field = self.get_float_value(self.imposto)  # Ajustado para passar o widget
 
-            print(f"[DEBUG] valorBase_from_field (antes do DB): {valorBase_from_field}")
-            print(f"[DEBUG] imposto_from_field (antes do DB): {imposto_from_field}")
-            print(f"[DEBUG] taxa (antes do DB): {taxa}")
+            print(f"[DEBUG - AddExpenseDialog] Saving - valorBase: {valorBase_from_field}")
+            print(f"[DEBUG - AddExpenseDialog] Saving - imposto: {imposto_from_field}")
+            print(f"[DEBUG - AddExpenseDialog] Saving - taxa: {taxa}")
 
-            # Obter a string da data do DateLineEdit (já formatada ou vazia)
-            data_compra_str = self.dataCompra.text()
-            data_venda_str = self.dataVenda.text()
+            # Obter a string da data do DateLineEdit (já formatada para DD-MM-AAAA ou vazia)
+            data_compra_ddmmyyyy = self.dataCompra.text()
+            data_venda_ddmmyyyy = self.dataVenda.text()
+
+            # Converter para yyyy-MM-dd para armazenar no DB
+            data_compra_db = ""
+            if data_compra_ddmmyyyy:
+                qdate_compra = QDate.fromString(data_compra_ddmmyyyy, "dd-MM-yyyy")
+                if qdate_compra.isValid():
+                    data_compra_db = qdate_compra.toString("yyyy-MM-dd")
+            print(
+                f"[DEBUG - AddExpenseDialog] dataCompra_ddmmyyyy: '{data_compra_ddmmyyyy}' -> dataCompra_db: '{data_compra_db}'")
+
+            data_venda_db = ""
+            if data_venda_ddmmyyyy:
+                qdate_venda = QDate.fromString(data_venda_ddmmyyyy, "dd-MM-yyyy")
+                if qdate_venda.isValid():
+                    data_venda_db = qdate_venda.toString("yyyy-MM-dd")
+            print(
+                f"[DEBUG - AddExpenseDialog] dataVenda_ddmmyyyy: '{data_venda_ddmmyyyy}' -> dataVenda_db: '{data_venda_db}'")
 
             regime_fiscal = ""
             if self.regime_geral_radio.isChecked():
@@ -986,11 +1030,11 @@ class AddExpenseDialog(QDialog):
                     "numeroQuadro": numero_quadro,
                     "isv": isv,
                     "nRegistoContabilidade": nRegistoContabilidade,
-                    "dataCompra": data_compra_str,  # Usar a string direta do DateLineEdit
+                    "dataCompra": data_compra_db,  # Salvar no DB como yyyy-MM-dd
                     "docCompra": self.docCompra.text(),
                     "tipoDocumento": self.tipoDocumento.currentText(),
                     "valorCompra": valor_compra,
-                    "dataVenda": data_venda_str,  # Usar a string direta do DateLineEdit
+                    "dataVenda": data_venda_db,  # Salvar no DB como yyyy-MM-dd
                     "docVenda": self.docVenda.text(),
                     "valorVenda": valor_venda,
                     "imposto": imposto_from_field,
@@ -1005,11 +1049,11 @@ class AddExpenseDialog(QDialog):
                 print(f"numeroQuadro: {numero_quadro}")
                 print(f"isv: {isv}")
                 print(f"nRegistoContabilidade: {nRegistoContabilidade}")
-                print(f"dataCompra: {data_compra_str}")
+                print(f"dataCompra: {data_compra_db}")
                 print(f"docCompra: {self.docCompra.text()}")
                 print(f"tipoDocumento: {self.tipoDocumento.currentText()}")
                 print(f"valorCompra: {valor_compra}")
-                print(f"dataVenda: {data_venda_str}")
+                print(f"dataVenda: {data_venda_db}")
                 print(f"docVenda: {self.docVenda.text()}")
                 print(f"valorVenda: {valor_venda}")
                 print(f"imposto: {imposto_from_field}")
@@ -1021,9 +1065,8 @@ class AddExpenseDialog(QDialog):
                 success = add_expense_to_db(
                     self.matricula.text(), self.marca.text(), numero_quadro, isv,
                     nRegistoContabilidade,
-                    data_compra_str, self.docCompra.text(),  # Usar a string direta do DateLineEdit
-                    self.tipoDocumento.currentText(), valor_compra, data_venda_str,
-                    # Usar a string direta do DateLineEdit
+                    data_compra_db, self.docCompra.text(),  # Salvar no DB como yyyy-MM-dd
+                    self.tipoDocumento.currentText(), valor_compra, data_venda_db,  # Salvar no DB como yyyy-MM-dd
                     self.docVenda.text(), valor_venda, imposto_from_field, valorBase_from_field, taxa,
                     regime_fiscal
                 )
@@ -1090,6 +1133,7 @@ class ExpenseApp(QWidget):
     def open_edit_expense_dialog(self, row, column):
         vehicle_id = int(self.table.item(row, 0).text())
         initial_data = fetch_vehicle_by_id(vehicle_id)
+        print(f"[DEBUG - ExpenseApp] Fetched initial_data for ID {vehicle_id}: {initial_data}")
 
         if initial_data:
             dialog = AddExpenseDialog(self, mode="edit", initial_data=initial_data)
@@ -1258,14 +1302,14 @@ class ExpenseApp(QWidget):
     }
 
     QCalendarWidget QWidget#qt_calendar_navigationbar { /* Barra de navegação */
-        background-color: #f0f0f0; /* Fundo cinza claro */
-        color: #333; /* Cor do texto */
+        background-color: #4caf50; /* Verde principal para a barra inteira */
+        color: white; /* Cor do texto para toda a barra */
         border-top-left-radius: 5px;
         border-top-right-radius: 5px;
     }
     /* Estilo dos botões de navegação e ano/mês */
     QCalendarWidget QWidget#qt_calendar_navigationbar QPushButton {
-        background-color: #4caf50;
+        background-color: #4caf50; /* Verde */
         color: white;
         border: 1px solid #3d8b40;
         border-radius: 3px;
@@ -1283,8 +1327,8 @@ class ExpenseApp(QWidget):
         border: 1px solid #b0bfc6;
         border-radius: 3px;
         padding-right: 15px; /* Espaço para o botão de seta */
-        color: #333;
-        background-color: #ffffff;
+        color: white; /* Cor do texto do spinbox */
+        background-color: #4caf50; /* Fundo verde para o spinbox */
     }
     QCalendarWidget QSpinBox::up-button, QCalendarWidget QSpinBox::down-button {
         width: 16px;
@@ -1370,11 +1414,3 @@ class ExpenseApp(QWidget):
             if delete_expense_from_db(expense_id):
                 self.load_table_data()
                 self.table.clearSelection()  # Deselects the row after deletion
-
-    def clear_inputs(self):
-        # Estes campos não estão definidos nesta classe, verificar se são necessários
-        # self.date_box.setDate(QDate.currentDate())
-        # self.dropdown.setCurrentIndex(0)
-        # self.amount.clear()
-        # self.description.clear()
-        pass
