@@ -150,9 +150,9 @@ class AddExpenseDialog(QDialog):
         self.docVenda = QLineEdit()
         self.valorVenda = QLineEdit()
 
-        self.imposto = QLineEdit()
-        self.valorBase = QLineEdit()
         self.taxa = QLineEdit()
+        self.valorBase = QLineEdit()
+        self.imposto = QLineEdit()
 
         # NOVOS CAMPOS: Checkboxes para o Regime Fiscal
         self.regime_geral_radio = QRadioButton("Regime Normal")
@@ -167,9 +167,9 @@ class AddExpenseDialog(QDialog):
         imposto_group = QGroupBox("Imposto")
         imposto_layout = QFormLayout()
         imposto_layout.addRow("Regime Fiscal:", regime_layout)
-        imposto_layout.addRow("Imposto:", self.imposto)
-        imposto_layout.addRow("Valor Base:", self.valorBase)
         imposto_layout.addRow("Taxa:", self.taxa)
+        imposto_layout.addRow("Valor Base:", self.valorBase)
+        imposto_layout.addRow("Imposto:", self.imposto)
         imposto_group.setLayout(imposto_layout)
 
         # Layout principal - Adicionar os grupos de campos aqui
