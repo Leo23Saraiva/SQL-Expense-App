@@ -106,7 +106,7 @@ class AddExpenseDialog(QDialog):
         else:
             self.dataVenda.setDate(QDate.currentDate())  # Define uma data padrão se não houver data
 
-        self.docVenda.setText(self.initial_data.get("docVenda", ""))  # Correção: docVenda é texto
+        self.docVenda.setText(format_real_for_display(self.initial_data.get("docVenda")))  # Correção: docVenda é texto
         self.valorVenda.setText(format_real_for_display(self.initial_data.get("valorVenda")))
 
         # Aplicar a função de formatação para imposto, valorBase e taxa
@@ -541,8 +541,9 @@ class AddExpenseDialog(QDialog):
             missing_fields.append("Matrícula")
         if not self.marca.text().strip():
             missing_fields.append("Marca")
-        if not self.numeroQuadro.text().strip(): # NOVO CAMPO: VALIDAÇÃO
-            missing_fields.append("Número de Quadro")
+        # Removido: A validação do numeroQuadro já não é obrigatória
+        # if not self.numeroQuadro.text().strip():
+        #    missing_fields.append("Número de Quadro")
         # Adicione mais validações de campos gerais aqui se necessário
 
         if missing_fields:
@@ -605,7 +606,7 @@ class AddExpenseDialog(QDialog):
                 success = update_expense_in_db(self.initial_data["id"], {
                     "matricula": self.matricula.text(),
                     "marca": self.marca.text(),
-                    "numeroQuadro": numero_quadro,
+                    "numeroQuadro": numero_quadro, # NOVO CAMPO NO DICIONÁRIO
                     "isv": isv,
                     "nRegistoContabilidade": nRegistoContabilidade,
                     "dataCompra": data_compra_str,
