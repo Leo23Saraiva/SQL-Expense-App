@@ -934,8 +934,8 @@ class AddExpenseDialog(QDialog):
         """Atualiza o estado (enabled/disabled) dos radio buttons do regime fiscal
         e reinicia a seleção se as condições não forem cumpridas."""
 
-        valor_compra_text = self.valorCompra.text().strip().replace(',', '.')
-        valor_venda_text = self.valorVenda.text().strip().replace(',', '.')
+        valor_compra_text = self.valorCompra.text().strip().replace(" ", "").replace(',', '.')
+        valor_venda_text = self.valorVenda.text().strip().replace(" ", "").replace(',', '.')
         taxa_selecionada = self.taxa.currentText()
 
         try:
@@ -948,7 +948,6 @@ class AddExpenseDialog(QDialog):
         # Condição para habilitar Regime Geral (Normal)
         # Valor de venda preenchido E valor de compra preenchido E taxa selecionada diferente de "N/A"
         enable_regime_geral = (
-                valor_compra > 0 and
                 valor_venda > 0 and
                 taxa_selecionada != "N/A"
         )
@@ -957,8 +956,8 @@ class AddExpenseDialog(QDialog):
         # Valor de venda preenchido E valor de compra preenchido E taxa selecionada diferente de "N/A"
         # E (Valor Venda - Valor Compra) > 0
         enable_regime_lucro = (
-                enable_regime_geral and
-                (valor_venda - valor_compra) > 0
+                valor_compra > 0 and
+                enable_regime_geral
         )
 
         # Aplicar estados
@@ -1006,8 +1005,9 @@ class AddExpenseDialog(QDialog):
 
     def calculate_regime_fields(self):
         """Calcula o Valor Base e o Imposto com base nas novas regras."""
-        valor_compra_text = self.valorCompra.text().strip().replace(',', '.')
-        valor_venda_text = self.valorVenda.text().strip().replace(',', '.')
+
+        valor_compra_text = self.valorCompra.text().strip().replace(" ", "").replace(',', '.')
+        valor_venda_text = self.valorVenda.text().strip().replace(" ", "").replace(',', '.')
         taxa_str = self.taxa.currentText()
 
         try:
@@ -1015,7 +1015,6 @@ class AddExpenseDialog(QDialog):
             valor_venda = Decimal(valor_venda_text) if valor_venda_text else Decimal(0)
             taxa = Decimal(taxa_str) if taxa_str != "N/A" else Decimal(0)
         except Exception:
-            # Se a conversão falhar, limpa os campos de cálculo e sai
             self.valorBase.setText("")
             self.imposto.setText("")
             return
@@ -1023,38 +1022,25 @@ class AddExpenseDialog(QDialog):
         valor_base = Decimal(0)
         imposto = Decimal(0)
 
-        # NOVO: Esta função agora usa QLocale para formatação localizada (pontos de milhar, vírgula decimal)
         def format_decimal_for_display(value):
             locale = QLocale(QLocale.Language.Portuguese, QLocale.Country.Portugal)
-            # Define o comportamento de arredondamento para sempre ter duas casas decimais
             return locale.toString(float(value.quantize(Decimal("0.01"))), 'f', 2)
 
         if self.regime_geral_radio.isChecked():
-            # Regime Normal: valor base = valor venda, imposto = valor venda * (taxa / 100)
             valor_base = valor_venda
             imposto = valor_venda * (taxa / Decimal(100))
-            print(f"[DEBUG - Calc] Regime Normal - Venda: {valor_venda}, Taxa: {taxa}, Imposto: {imposto}")
         elif self.regime_lucro_tributavel_radio.isChecked():
-            # Regime da Margem: valor base = valor venda - valor compra, imposto = valor base * (taxa / 100)
             margem = valor_venda - valor_compra
             if margem > 0:
                 valor_base = margem
                 imposto = margem * (taxa / Decimal(100))
             else:
-                # Se a margem for <= 0, não há imposto neste regime
                 valor_base = Decimal(0)
                 imposto = Decimal(0)
-            print(
-                f"[DEBUG - Calc] Regime Margem - Venda: {valor_venda}, Compra: {valor_compra}, Margem: {margem}, Taxa: {taxa}, Imposto: {imposto}")
         else:
-            # Se nenhum regime estiver selecionado, os campos ficam vazios
             self.valorBase.setText("")
             self.imposto.setText("")
-            return  # Sai da função, pois não há cálculo a fazer
-
-        # Arredondar para duas casas decimais
-        valor_base = valor_base.quantize(Decimal("0.01"))
-        imposto = imposto.quantize(Decimal("0.01"))
+            return
 
         self.valorBase.setText(format_decimal_for_display(valor_base))
         self.imposto.setText(format_decimal_for_display(imposto))
