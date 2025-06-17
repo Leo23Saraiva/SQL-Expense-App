@@ -1,3 +1,5 @@
+import re
+
 from PyQt6.QtWidgets import (
     QWidget, QLabel, QPushButton, QLineEdit, QComboBox,
     QTableWidget, QVBoxLayout, QHBoxLayout, QMessageBox, QTableWidgetItem,
@@ -934,8 +936,8 @@ class AddExpenseDialog(QDialog):
         """Atualiza o estado (enabled/disabled) dos radio buttons do regime fiscal
         e reinicia a seleção se as condições não forem cumpridas."""
 
-        valor_compra_text = self.valorCompra.text().strip().replace(" ", "").replace(',', '.')
-        valor_venda_text = self.valorVenda.text().strip().replace(" ", "").replace(',', '.')
+        valor_compra_text = re.sub(r'[^\d.]', '', self.valorCompra.text().replace(',', '.'))
+        valor_venda_text = re.sub(r'[^\d.]', '', self.valorVenda.text().replace(',', '.'))
         taxa_selecionada = self.taxa.currentText()
 
         try:
@@ -1006,8 +1008,8 @@ class AddExpenseDialog(QDialog):
     def calculate_regime_fields(self):
         """Calcula o Valor Base e o Imposto com base nas novas regras."""
 
-        valor_compra_text = self.valorCompra.text().strip().replace(" ", "").replace(',', '.')
-        valor_venda_text = self.valorVenda.text().strip().replace(" ", "").replace(',', '.')
+        valor_compra_text = re.sub(r'[^\d.]', '', self.valorCompra.text().replace(',', '.'))
+        valor_venda_text = re.sub(r'[^\d.]', '', self.valorVenda.text().replace(',', '.'))
         taxa_str = self.taxa.currentText()
 
         try:
