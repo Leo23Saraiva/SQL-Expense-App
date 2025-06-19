@@ -4,7 +4,7 @@ from PyQt6.QtWidgets import (
     QWidget, QLabel, QPushButton, QLineEdit, QComboBox,
     QTableWidget, QVBoxLayout, QHBoxLayout, QMessageBox, QTableWidgetItem,
     QHeaderView, QDialog, QGraphicsOpacityEffect, QGroupBox, QFormLayout,
-    QRadioButton, QCalendarWidget, QCompleter
+    QRadioButton, QCalendarWidget, QCompleter, QCheckBox
 )
 from PyQt6.QtCore import QDate, Qt, QLocale, QEvent
 from PyQt6.QtGui import QValidator, QColor
@@ -1099,6 +1099,11 @@ class ExpenseApp(QWidget):
         self.print_button = QPushButton("Imprimir Tabela")
         self.print_button.clicked.connect(self.print_table)
 
+        self.checkbox_vendidos = QCheckBox("Vendidos")
+        self.checkbox_stock = QCheckBox("Em stock")
+        self.checkbox_vendidos.setChecked(True)
+        self.checkbox_stock.setChecked(True)
+
         self.search_input = QLineEdit()
         self.search_input.setPlaceholderText("Pesquisar por Matrícula ou Marca...")
 
@@ -1128,9 +1133,13 @@ class ExpenseApp(QWidget):
         search_layout.addWidget(self.search_input)
         search_layout.addWidget(self.clear_search_button)  # X antes da lupa
         search_layout.addWidget(self.search_button)  # Botão de pesquisa (Lupa)
+        search_layout.addWidget(self.checkbox_vendidos)
+        search_layout.addWidget(self.checkbox_stock)
 
         self.add_button.clicked.connect(self.show_add_dialog)
         self.delete_button.clicked.connect(self.delete_expense)
+        self.checkbox_vendidos.stateChanged.connect(self.load_table_data)
+        self.checkbox_stock.stateChanged.connect(self.load_table_data)
         # self.search_button.clicked.connect(self.search_expenses) # Conectado acima
 
         main_layout = QVBoxLayout()
@@ -1437,60 +1446,48 @@ class ExpenseApp(QWidget):
         expenses = fetch_expenses()
         self.table.setRowCount(0)
 
-        # Colunas visíveis na tabela: ID, Matrícula, Marca, Valor Compra, Doc Venda, Valor Venda, Imposto
-        # total de 7 colunas visíveis + a dataVenda que será a 8ª coluna (índice 7) do `expense`
-        # para a lógica do vendido
+        mostrar_vendidos = self.checkbox_vendidos.isChecked()
+        mostrar_stock = self.checkbox_stock.isChecked()
 
-        for row_idx, expense in enumerate(expenses):
-            self.table.insertRow(row_idx)
+        for expense in expenses:
+            data_venda = expense[8]  # Último campo: dataVenda
+            valor_venda = expense[5]
+            doc_venda = expense[4]
 
-            # Extrair os campos relevantes para a condição "vendido"
-            data_venda = expense[8]  # dataVenda é o último elemento retornado por fetch_expenses
-            valor_venda = expense[5]  # valorVenda
-            doc_venda = expense[4]  # docVenda
-
-            # Lógica para determinar se o veículo está vendido
-            # Consideramos vendido se pelo menos um dos campos de venda estiver preenchido
             is_sold = bool(data_venda) or \
                       (valor_venda is not None and str(valor_venda).strip() != "" and float(valor_venda) > 0) or \
                       (doc_venda is not None and str(doc_venda).strip() != "")
 
-            # Definir a cor de fundo para a linha inteira se o veículo estiver vendido
-            # O ideal é aplicar a cor a cada item individualmente para garantir que o estilo de seleção sobrepõe
-            sold_background_color = QColor("#d4edda")  # ou QColor("#e0ffe0") para um verde mais suave ainda
+            # Aplica o filtro. Se nenhum for selecionado, mostra nada.
+            if not mostrar_vendidos and not mostrar_stock:
+                continue
+            elif is_sold and not mostrar_vendidos:
+                continue
+            elif not is_sold and not mostrar_stock:
+                continue
 
-            # Iterar apenas sobre as colunas visíveis para definir os itens da tabela
-            # As colunas visíveis são de 0 a 6
-            for col_idx in range(8):  # 0 a 6 (7 colunas)
-                data = expense[col_idx]  # Acessa os dados originais da linha
+            # A linha passou no filtro, pode ser inserida
+            row_idx = self.table.rowCount()
+            self.table.insertRow(row_idx)
 
-                # Formata colunas específicas com duas casas decimais se forem numéricas
-                # Colunas: 3 (Valor Compra), 5 (Valor Venda), 6 (Imposto)
-                if col_idx in [3, 5, 6, 7]:
+            for col_idx in range(8):  # 0–7 → inclui "Valor Base"
+                data = expense[col_idx]
+
+                if col_idx in [3, 5, 6, 7]:  # valorCompra, valorVenda, imposto, valorBase
                     try:
-                        # Se o dado for None ou string vazia, exibe string vazia
                         if data is None or (isinstance(data, str) and not str(data).strip()):
                             formatted_data = ""
                         else:
-                            # Usa QLocale para formatar números na tabela
                             locale = QLocale(QLocale.Language.Portuguese, QLocale.Country.Portugal)
                             formatted_data = locale.toString(float(data), 'f', 2)
                         item = QTableWidgetItem(formatted_data)
                     except (ValueError, TypeError):
-                        # Se não for um número válido, exibe como string
                         item = QTableWidgetItem(str(data))
                 else:
                     item = QTableWidgetItem(str(data))
 
-                # Se o veículo estiver vendido, aplicar o background à célula
                 if is_sold:
-                    item.setBackground(sold_background_color)
-                    # Opcional: Para ter a certeza que o texto tem boa visibilidade
-                    # item.setForeground(QColor("#333333"))
-                    # Definir uma propriedade dinâmica para uso no CSS
-                    item.setData(Qt.ItemDataRole.UserRole, True)  # Exemplo de como usar UserRole
-                    # Ou de forma mais direta para CSS via propriedade:
-                    # item.setData(Qt.ItemDataRole.UserRole + 1, "true") # Para o QTableWidget::item[sold="true"]
+                    item.setBackground(QColor("#d4edda"))
 
                 self.table.setItem(row_idx, col_idx, item)
 
