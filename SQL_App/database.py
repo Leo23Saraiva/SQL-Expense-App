@@ -176,25 +176,3 @@ def fetch_vehicle_by_id(vehicle_id):
             "regime_fiscal": query.value(16)
         }
     return None
-
-
-def fetch_all_expenses_for_print():
-    query = QSqlQuery("SELECT * FROM vehicles")
-
-    # Força execução da query
-    if not query.exec():
-        print("Erro ao executar a query:", query.lastError().text())
-        return [], []
-
-    # Obter os nomes das colunas corretamente
-    record = query.record()
-    headers = [record.fieldName(i) for i in range(record.count())]
-
-    # Obter os dados de cada linha
-    data = []
-    while query.next():
-        row = [query.value(i) for i in range(record.count())]
-        data.append(row)
-
-    return headers, data
-
