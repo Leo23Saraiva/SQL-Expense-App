@@ -12,7 +12,7 @@ from PyQt6.QtPrintSupport import QPrinter, QPrintDialog
 from PyQt6.QtGui import QIcon, QTextDocument, QTextCursor
 from decimal import Decimal
 
-from database import fetch_expenses, add_expense_to_db, delete_expense_from_db, update_expense_in_db, \
+from database import fetch_expenses, fetch_all_expenses_for_print, add_expense_to_db, delete_expense_from_db, update_expense_in_db, \
     fetch_vehicle_by_id, init_db
 
 
@@ -1583,41 +1583,36 @@ class ExpenseApp(QWidget):
         self.load_table_data()
 
     def print_table(self):
-        # Cria o conteúdo em HTML com os dados da tabela
-        html = "<html><head><meta charset='utf-8'><style>"
-        html += "table { border-collapse: collapse; width: 100%; }"
-        html += "th, td { border: 1px solid black; padding: 8px; text-align: left; }"
-        html += "th { background-color: #4caf50; color: white; }"
-        html += "</style></head><body>"
-        html += "<h2>Registos de Veículos</h2><table>"
+        try:
+            headers, data = fetch_all_expenses_for_print()
 
-        # Cabeçalhos
-        html += "<tr>"
-        for col in range(self.table.columnCount()):
-            if not self.table.isColumnHidden(col):
-                html += f"<th>{self.table.horizontalHeaderItem(col).text()}</th>"
-        html += "</tr>"
+            html = "<html><head><style>"
+            html += "table { border-collapse: collapse; width: 100%; font-family: Arial; }"
+            html += "th, td { border: 1px solid #999; padding: 8px; text-align: center; font-size: 10pt; }"
+            html += "th { background-color: #4caf50; color: white; }"
+            html += "</style></head><body>"
+            html += "<h2 style='text-align:center;'>Relatório de Despesas</h2>"
+            html += "<table><tr>"
 
-        # Linhas da tabela
-        for row in range(self.table.rowCount()):
-            html += "<tr>"
-            for col in range(self.table.columnCount()):
-                if not self.table.isColumnHidden(col):
-                    item = self.table.item(row, col)
-                    html += f"<td>{item.text() if item else ''}</td>"
+            for header in headers:
+                html += f"<th>{header}</th>"
             html += "</tr>"
 
-        html += "</table></body></html>"
+            for row in data:
+                html += "<tr>"
+                for cell in row:
+                    html += f"<td>{cell if cell is not None else ''}</td>"
+                html += "</tr>"
 
-        # Cria o QTextDocument para impressão
-        document = QTextDocument()
-        document.setHtml(html)
+            html += "</table></body></html>"
 
-        # Configura a impressora
-        printer = QPrinter()
-        printer.setOutputFormat(QPrinter.OutputFormat.NativeFormat)
+            doc = QTextDocument()
+            doc.setHtml(html)
 
-        # Abre a caixa de diálogo de impressão
-        dialog = QPrintDialog(printer, self)
-        if dialog.exec() == QDialog.DialogCode.Accepted:
-            document.print(printer)
+            printer = QPrinter()
+            dialog = QPrintDialog(printer, self)
+            if dialog.exec():
+                doc.print(printer)
+
+        except Exception as e:
+            QMessageBox.critical(self, "Erro ao imprimir", f"Ocorreu um erro durante a impressão:\n{e}")
