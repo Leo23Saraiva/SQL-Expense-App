@@ -125,7 +125,7 @@ def fetch_expenses():
     expenses = []
     # Adicionado dataVenda à query
     query = QSqlQuery(
-        "SELECT id, matricula, marca, valorCompra, docVenda, valorVenda, imposto, dataVenda FROM vehicles")
+        "SELECT id, matricula, marca, valorCompra, docVenda, valorVenda, imposto, valorBase, dataVenda FROM vehicles")
     if not query.exec():
         print(f"Erro ao buscar despesas: {query.lastError().text()}")
         return expenses
@@ -139,7 +139,8 @@ def fetch_expenses():
             query.value(4),  # docVenda
             query.value(5),  # valorVenda
             query.value(6),  # imposto
-            query.value(7)  # dataVenda (Novo: para lógica de vendido)
+            query.value(7),  # valorBase
+            query.value(8)  # dataVenda (Novo: para lógica de vendido)
         ])
     return expenses
 
@@ -147,8 +148,8 @@ def fetch_expenses():
 def fetch_vehicle_by_id(vehicle_id):
     query = QSqlQuery()
     query.prepare("SELECT id, matricula, marca, numeroQuadro, isv, nRegistoContabilidade, dataCompra, docCompra, "
-                  "tipoDocumento, valorCompra, dataVenda, docVenda, valorVenda, imposto, valorBase, taxa, regime_fiscal "
-                  "FROM vehicles WHERE id = :id")
+                  "tipoDocumento, valorCompra, dataVenda, docVenda, valorVenda, imposto, valorBase, taxa, "
+                  "regime_fiscal FROM vehicles WHERE id = :id")
     query.bindValue(":id", vehicle_id)
 
     if not query.exec():

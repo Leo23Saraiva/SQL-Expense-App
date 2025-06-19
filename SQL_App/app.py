@@ -1070,9 +1070,9 @@ class ExpenseApp(QWidget):
         # self.setGeometry(100, 100, 1000, 600)  # Maior para acomodar as colunas
 
         self.table = QTableWidget()
-        self.table.setColumnCount(7)  # ID, Matrícula, Marca, Valor Compra, Doc Venda, Valor Venda, Imposto
+        self.table.setColumnCount(8)
         self.table.setHorizontalHeaderLabels(
-            ["ID", "Matrícula", "Marca", "Valor Compra", "Doc. Venda", "Valor Venda", "Imposto"])
+            ["ID", "Matrícula", "Marca", "Valor Compra", "Doc. Venda", "Valor Venda", "Imposto", "Valor Base"])
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)  # Make table non-editable
         self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)  # Selects entire row
@@ -1440,7 +1440,7 @@ class ExpenseApp(QWidget):
             self.table.insertRow(row_idx)
 
             # Extrair os campos relevantes para a condição "vendido"
-            data_venda = expense[7]  # dataVenda é o último elemento retornado por fetch_expenses
+            data_venda = expense[8]  # dataVenda é o último elemento retornado por fetch_expenses
             valor_venda = expense[5]  # valorVenda
             doc_venda = expense[4]  # docVenda
 
@@ -1456,12 +1456,12 @@ class ExpenseApp(QWidget):
 
             # Iterar apenas sobre as colunas visíveis para definir os itens da tabela
             # As colunas visíveis são de 0 a 6
-            for col_idx in range(7):  # 0 a 6 (7 colunas)
+            for col_idx in range(8):  # 0 a 6 (7 colunas)
                 data = expense[col_idx]  # Acessa os dados originais da linha
 
                 # Formata colunas específicas com duas casas decimais se forem numéricas
                 # Colunas: 3 (Valor Compra), 5 (Valor Venda), 6 (Imposto)
-                if col_idx in [3, 5, 6]:
+                if col_idx in [3, 5, 6, 7]:
                     try:
                         # Se o dado for None ou string vazia, exibe string vazia
                         if data is None or (isinstance(data, str) and not str(data).strip()):
@@ -1544,7 +1544,7 @@ class ExpenseApp(QWidget):
                 self.table.insertRow(row_idx)
 
                 # Extrair os campos relevantes para a condição "vendido"
-                data_venda = expense[7]  # dataVenda é o último elemento retornado por fetch_expenses
+                data_venda = expense[8]  # dataVenda é o último elemento retornado por fetch_expenses
                 valor_venda = expense[5]  # valorVenda
                 doc_venda = expense[4]  # docVenda
 
@@ -1555,10 +1555,10 @@ class ExpenseApp(QWidget):
 
                 sold_background_color = QColor("#d4edda")
 
-                for col_id in range(7):  # Columns 0 to 6 are visible
+                for col_id in range(8):  # Columns 0 to 6 are visible
                     data = expense[col_id]
 
-                    if col_id in [3, 5, 6]:  # Valor Compra, Valor Venda, Imposto
+                    if col_id in [3, 5, 6, 7]:  # Valor Compra, Valor Venda, Imposto, valor base
                         try:
                             if data is None or (isinstance(data, str) and not str(data).strip()):
                                 formatted_data = ""
