@@ -1037,10 +1037,10 @@ class AddExpenseDialog(QDialog):
             return locale.toString(float(value.quantize(Decimal("0.01"))), 'f', 2)
 
         if self.regime_geral_radio.isChecked():
-            valor_base = valor_venda
-            imposto = valor_venda * (taxa / Decimal(100))
+            valor_base = valor_venda / (1 + taxa / 100)
+            imposto = valor_base * (taxa / Decimal(100))
         elif self.regime_lucro_tributavel_radio.isChecked():
-            margem = valor_venda - valor_compra
+            margem = (valor_venda - valor_compra) / (1 + taxa / 100)
             if margem > 0:
                 valor_base = margem
                 imposto = margem * (taxa / Decimal(100))
