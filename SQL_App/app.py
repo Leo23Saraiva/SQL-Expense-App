@@ -4,7 +4,7 @@ from PyQt6.QtWidgets import (
     QWidget, QLabel, QPushButton, QLineEdit, QComboBox,
     QTableWidget, QVBoxLayout, QHBoxLayout, QMessageBox, QTableWidgetItem,
     QHeaderView, QDialog, QGraphicsOpacityEffect, QGroupBox, QFormLayout,
-    QRadioButton, QCalendarWidget
+    QRadioButton, QCalendarWidget, QCompleter
 )
 from PyQt6.QtCore import QDate, Qt, QLocale, QEvent
 from PyQt6.QtGui import QValidator, QColor
@@ -12,7 +12,7 @@ from PyQt6.QtPrintSupport import QPrinter, QPrintDialog
 from PyQt6.QtGui import QIcon, QTextDocument, QTextCursor
 from decimal import Decimal
 
-from database import fetch_expenses, add_expense_to_db, delete_expense_from_db, update_expense_in_db, \
+from database import fetch_expenses, fetch_unique_marcas, add_expense_to_db, delete_expense_from_db, update_expense_in_db, \
     fetch_vehicle_by_id, init_db
 
 
@@ -452,6 +452,11 @@ class AddExpenseDialog(QDialog):
         self.numeroQuadro = QLineEdit()
         self.isv = QLineEdit()
         self.nRegistoContabilidade = QLineEdit()
+
+        marcas = fetch_unique_marcas()
+        completer = QCompleter(marcas)
+        completer.setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
+        self.marca.setCompleter(completer)
 
         # Substituir QDateEdit por DateLineEdit personalizado
         self.dataCompra = DateLineEdit(self)  # Passar self para a referência parent_dialog

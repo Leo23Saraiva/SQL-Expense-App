@@ -177,3 +177,12 @@ def fetch_vehicle_by_id(vehicle_id):
             "regime_fiscal": query.value(16)
         }
     return None
+
+def fetch_unique_marcas():
+    query = QSqlQuery("SELECT DISTINCT marca FROM vehicles ORDER BY marca COLLATE NOCASE")
+    marcas = []
+    while query.next():
+        marca = query.value(0)
+        if marca:
+            marcas.append(str(marca))
+    return marcas
