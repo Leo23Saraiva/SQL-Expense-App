@@ -683,27 +683,6 @@ class AddExpenseDialog(QDialog):
         padding: 5px;
         border-radius: 4px;
     }
-    
-    QCheckBox {
-        color: #333333;
-        font-weight: normal;
-        spacing: 6px;
-    }
-    
-    QCheckBox::indicator {
-        width: 14px;
-        height: 14px;
-    }
-    
-    QCheckBox::indicator:checked {
-        background-color: #4caf50;
-        border: 1px solid #388e3c;
-    }
-    
-    QCheckBox::indicator:unchecked {
-        background-color: white;
-        border: 1px solid #888;
-    }
 
     /* ESTILO PARA QRadioButton */
     QRadioButton {
@@ -1238,6 +1217,27 @@ class ExpenseApp(QWidget):
         font-size: 12px;
         padding: 5px;
         border-radius: 4px;
+    }
+
+    QCheckBox {
+        color: #333333;
+        font-weight: normal;
+        spacing: 6px;
+    }
+    
+    QCheckBox::indicator {
+        width: 14px;
+        height: 14px;
+    }
+    
+    QCheckBox::indicator:checked {
+        background-color: #4caf50;
+        border: 1px solid #388e3c;
+    }
+    
+    QCheckBox::indicator:unchecked {
+        background-color: white;
+        border: 1px solid #888;
     }
 
     /* ESTILO PARA QRadioButton */
