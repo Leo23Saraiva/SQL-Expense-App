@@ -178,6 +178,7 @@ def fetch_vehicle_by_id(vehicle_id):
         }
     return None
 
+
 def fetch_unique_marcas():
     query = QSqlQuery("SELECT DISTINCT marca FROM vehicles ORDER BY marca COLLATE NOCASE")
     marcas = []
@@ -186,3 +187,13 @@ def fetch_unique_marcas():
         if marca:
             marcas.append(str(marca))
     return marcas
+
+
+def fetch_unique_matriculas():
+    query = QSqlQuery("SELECT DISTINCT matricula FROM vehicles ORDER BY matricula COLLATE NOCASE")
+    matriculas = []
+    while query.next():
+        matricula = query.value(0)
+        if matricula:
+            matriculas.append(str(matricula))
+    return matriculas
