@@ -65,7 +65,7 @@ def update_expense_in_db(id, data: dict):
     # Certifique-se de que os valores 'None' são tratados como QVariant() nulo
     for key, value in data.items():
         if value is None:
-            query.bindValue(f":{key}", None) # QVariant() para NULL
+            query.bindValue(f":{key}", None)  # QVariant() para NULL
         else:
             query.bindValue(f":{key}", value)
     query.bindValue(":id", id)
@@ -74,6 +74,7 @@ def update_expense_in_db(id, data: dict):
         print(f"Erro ao atualizar registo: {query.lastError().text()}")
         return False
     return True
+
 
 def add_expense_to_db(matricula, marca, numeroQuadro, isv, nRegistoContabilidade,
                       dataCompra, docCompra, tipoDocumento, valorCompra,
@@ -109,6 +110,7 @@ def add_expense_to_db(matricula, marca, numeroQuadro, isv, nRegistoContabilidade
         return False
     return True
 
+
 def delete_expense_from_db(id):
     query = QSqlQuery()
     query.prepare("DELETE FROM vehicles WHERE id = :id")
@@ -118,10 +120,12 @@ def delete_expense_from_db(id):
         return False
     return True
 
+
 def fetch_expenses():
     expenses = []
     # Adicionado dataVenda à query
-    query = QSqlQuery("SELECT id, matricula, marca, valorCompra, docVenda, valorVenda, imposto, dataVenda FROM vehicles")
+    query = QSqlQuery(
+        "SELECT id, matricula, marca, valorCompra, docVenda, valorVenda, imposto, dataVenda FROM vehicles")
     if not query.exec():
         print(f"Erro ao buscar despesas: {query.lastError().text()}")
         return expenses
@@ -135,9 +139,10 @@ def fetch_expenses():
             query.value(4),  # docVenda
             query.value(5),  # valorVenda
             query.value(6),  # imposto
-            query.value(7)   # dataVenda (Novo: para lógica de vendido)
+            query.value(7)  # dataVenda (Novo: para lógica de vendido)
         ])
     return expenses
+
 
 def fetch_vehicle_by_id(vehicle_id):
     query = QSqlQuery()

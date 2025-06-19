@@ -8,10 +8,12 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import QDate, Qt, QLocale, QEvent
 from PyQt6.QtGui import QValidator, QColor
+from PyQt6.QtPrintSupport import QPrinter, QPrintDialog
+from PyQt6.QtGui import QIcon, QTextDocument, QTextCursor
 from decimal import Decimal
 
 from database import fetch_expenses, add_expense_to_db, delete_expense_from_db, update_expense_in_db, \
-    fetch_vehicle_by_id
+    fetch_vehicle_by_id, init_db
 
 
 # --- NOVA CLASSE AUXILIAR PARA O CAMPO DE DATA PERSONALIZADO ---
@@ -437,6 +439,12 @@ class AddExpenseDialog(QDialog):
     def init_ui(self):
         self.setWindowTitle("MBAuto - Detalhes")
         self.setWindowModality(Qt.WindowModality.ApplicationModal)
+
+        self.db_name = "vehicles.db"
+        if not init_db(self.db_name):
+            QMessageBox.critical(self, "Erro", "Não foi possível inicializar a base de dados.")
+            self.close()
+            return
 
         # Campos
         self.matricula = QLineEdit()
@@ -1074,9 +1082,18 @@ class ExpenseApp(QWidget):
 
         # Hide the ID column
         self.table.setColumnHidden(0, True)
+        self.column_labels = [
+            "ID", "Matrícula", "Marca", "Nº Quadro", "ISV",
+            "Nº Registo Contabilidade", "Data Compra", "Documento Compra",
+            "Tipo Documento", "Valor Compra", "Data Venda", "Documento Venda",
+            "Valor Venda", "Imposto", "Valor Base", "Taxa", "Regime Fiscal"
+        ]
 
         self.add_button = QPushButton("Adicionar Registo")
         self.delete_button = QPushButton("Apagar Registo")
+        self.print_button = QPushButton("Imprimir Tabela")
+        self.print_button.clicked.connect(self.print_table)
+
         self.search_input = QLineEdit()
         self.search_input.setPlaceholderText("Pesquisar por Matrícula ou Marca...")
 
@@ -1099,6 +1116,7 @@ class ExpenseApp(QWidget):
         button_layout = QHBoxLayout()
         button_layout.addWidget(self.add_button)
         button_layout.addWidget(self.delete_button)
+        button_layout.addWidget(self.print_button)
         button_layout.addStretch(1)  # Push buttons to the left
 
         search_layout = QHBoxLayout()
@@ -1563,3 +1581,43 @@ class ExpenseApp(QWidget):
         """Limpa o campo de pesquisa e recarrega todos os dados da tabela."""
         self.search_input.clear()
         self.load_table_data()
+
+    def print_table(self):
+        # Cria o conteúdo em HTML com os dados da tabela
+        html = "<html><head><meta charset='utf-8'><style>"
+        html += "table { border-collapse: collapse; width: 100%; }"
+        html += "th, td { border: 1px solid black; padding: 8px; text-align: left; }"
+        html += "th { background-color: #4caf50; color: white; }"
+        html += "</style></head><body>"
+        html += "<h2>Registos de Veículos</h2><table>"
+
+        # Cabeçalhos
+        html += "<tr>"
+        for col in range(self.table.columnCount()):
+            if not self.table.isColumnHidden(col):
+                html += f"<th>{self.table.horizontalHeaderItem(col).text()}</th>"
+        html += "</tr>"
+
+        # Linhas da tabela
+        for row in range(self.table.rowCount()):
+            html += "<tr>"
+            for col in range(self.table.columnCount()):
+                if not self.table.isColumnHidden(col):
+                    item = self.table.item(row, col)
+                    html += f"<td>{item.text() if item else ''}</td>"
+            html += "</tr>"
+
+        html += "</table></body></html>"
+
+        # Cria o QTextDocument para impressão
+        document = QTextDocument()
+        document.setHtml(html)
+
+        # Configura a impressora
+        printer = QPrinter()
+        printer.setOutputFormat(QPrinter.OutputFormat.NativeFormat)
+
+        # Abre a caixa de diálogo de impressão
+        dialog = QPrintDialog(printer, self)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            document.print(printer)
